@@ -1,0 +1,112 @@
+
+We centered the response variable within task, and also performed a logit. 
+
+```{r}
+#standardize score within task
+test_df <- 
+  test_df %>%
+  group_by(task) %>%
+  mutate(score_z = scale(score))
+
+#log
+test_df <-
+  test_df %>%
+  mutate(score_log = logit(score))
+```
+
+The process improved the look of the distributions, both within each model, and within each task:
+
+```{r}
+## compare the data by model, before and after adjustments
+ggplot(test_df, aes(x = score, color = model, fill=model)) +
+  geom_histogram(bins = 1000) +
+  facet_wrap(~model)
+
+ggplot(test_df, aes(x = score_z, color = model, fill=model)) +
+  geom_histogram(bins = 1000) +
+  facet_wrap(~model)
+
+ggplot(test_df, aes(x = score_log, color = model, fill=model)) +
+  geom_histogram(bins = 1000) +
+  facet_wrap(~model)
+
+```
+
+```{r}
+#test_df <- test_df %>% 
+#  filter(score_z < 3.5)
+```
+
+```{r}
+##compare the data by task, before and after centering
+ggplot(test_df, aes(x = score, color = task, fill=task)) +
+  geom_histogram(bins = 50) +
+  facet_wrap(~task)
+
+ggplot(test_df, aes(x = score_z, color = task, fill=task)) +
+  geom_histogram(bins = 50) +
+  facet_wrap(~task)
+
+ggplot(test_df, aes(x = score_log, color = task, fill=task)) +
+  geom_histogram(bins = 50) +
+  facet_wrap(~task)
+```
+
+
+WRMF has values with >3 standard deviations, which we consider outliers. So we removed all datapoints that were greater than 3.5 standard deviations from the mean. 
+
+
+Performance by number of features, or dimensions of features:
+
+```{r}
+boxplot(score_z~feature_number, data=test_df)
+```
+```{r}
+boxplot(score_z~dimension_number, data=test_df)
+```
+
+Confidence intervals by task and model:
+
+```{r}
+alpha <- .05
+ci_score <- 
+  test_df %>% 
+  group_by(task, model) %>%
+  dplyr::summarize(mean = mean(score),
+                   uci_score = mean(score) - qt(1-alpha/2, (n()-1))*sd(score)/sqrt(n()),
+                   lci_score = mean(score) + qt(1-alpha/2, (n()-1))*sd(score)/sqrt(n()))
+
+ci_score %>%
+  ggplot(aes(x = task, y =mean, fill = model)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  geom_errorbar(aes(ymin = lci_score, ymax = uci_score), position = "dodge")
+
+alpha <- .05
+ci_score_z <- 
+  test_df %>% 
+  group_by(task, model) %>%
+  dplyr::summarize(mean = mean(score_z),
+                   uci_score_z = mean(score_z) - qt(1-alpha/2, (n()-1))*sd(score_z)/sqrt(n()),
+                   lci_score_z = mean(score_z) + qt(1-alpha/2, (n()-1))*sd(score_z)/sqrt(n()))
+
+ci_score_z %>%
+  ggplot(aes(x = task, y =mean, fill = model)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  geom_errorbar(aes(ymin = lci_score_z, ymax = uci_score_z), position = "dodge")
+
+alpha <- .05
+ci_score_log <- 
+  test_df %>% 
+  group_by(task, model) %>%
+  dplyr::summarize(mean = mean(score_log),
+                   uci_score_log = mean(score_log) - qt(1-alpha/2, (n()-1))*sd(score_log)/sqrt(n()),
+                   lci_score_log = mean(score_log) + qt(1-alpha/2, (n()-1))*sd(score_log)/sqrt(n()))
+
+ci_score_log %>%
+  ggplot(aes(x = task, y =mean, fill = model)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  geom_errorbar(aes(ymin = lci_score_log, ymax = uci_score_log), position = "dodge")
+
+```
+
+

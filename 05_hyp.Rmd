@@ -1,0 +1,96 @@
+We also specify models based on what we expected the structure would be at the outset of the study. Specifically, our systems are nested within specific tasks such that the resulting score in those rows is the result of a system being used within a given task. The system used is the "model" column of the data, and the task is in the "task" column of the data. 
+
+Given the variance we observe while exploring the data, we can also see that the system used may have differing slopes, such that each system will benefit differently from the use of various features. As such, we estimate an intercept based on the interaction between "model" and "task", and an intercept for "model". 
+
+In addition to the random effects strucutre, the systems were run on sets of features extracted using the LyricPsych package: personality, values, topics, LIWC dictionary, and purely linguistic features. As the systems were run on all possible combinations of the features, we could expect multiple-way interactions to have an effect. 
+
+
+#our maximal hypothesized model
+```{r}
+#h0.0 <- lmer(score_z ~ personality+linguistic+topic+liwc+value+task+audio+
+#             personality:linguistic:topic:liwc:value:task +
+#             (model|task/model), REML=FALSE, data=test_df, control = lmerControl(optCtrl = #list(maxfun = 1000000)))
+
+#h0.1 <- lmer(score_z ~ (personality+linguistic+topic+liwc+value+task)^2+audio+
+#             (model|task/model), REML=FALSE, data=test_df, control = lmerControl(optCtrl = #list(maxfun = 1000000)))
+
+#h0.2 <- lmer(score_z ~ (personality+linguistic+topic+liwc+value+task)^2+audio+
+#             (1|task/model), REML=FALSE, data=test_df, control = lmerControl(optCtrl = #list(maxfun = 1000000)))
+
+#h0.3 <- lmer(score_z ~ (personality+linguistic+topic+liwc+value)^2+audio+task+
+#             (1|task/model), REML=FALSE, data=test_df, control = lmerControl(optCtrl = #list(maxfun = 1000000)))
+
+#save(h0.0, file="h0.0.rda")
+#save(h0.1, file="h0.1.rda")
+#save(h0.2, file="h0.2.rda")
+#save(h0.3, file="h0.3.rda")
+load(here("models", "h0.0.rda"))
+load(here("models", "h0.1.rda"))
+load(here("models", "h0.2.rda"))
+load(here("models", "h0.3.rda"))
+```
+
+#model comparisons
+```{r}
+anova(h0.0, h0.1, h0.2, h0.3)
+```
+
+The best fitting models have full-factorial interactions. So we apply the step function. 
+```{r}
+step(h0.1) #score_z ~ linguistic + topic + liwc + value + task + audio + (model | task) + topic:liwc + topic:task + liwc:task + value:task
+step(h0.2) #score_z ~ linguistic + topic + liwc + value + task + audio + (1 | model:task) + topic:liwc + topic:task + liwc:task + value:task
+step(h0.3) #score_z ~ linguistic + topic + liwc + value + audio + (1 | model:task) + topic:liwc
+```
+model 1.2 has the best fit
+```{r}
+#h1.1 <- lmer(score_z ~ linguistic + topic + liwc + value + task + audio + topic:liwc + topic:task + liwc:task + value:task + #(model|task), REML=FALSE, data=test_df, control = lmerControl(optCtrl = list(maxfun = 1000000)))
+
+#h1.2 <- lmer(score_z ~ linguistic + topic + liwc + value + task + audio + topic:liwc + topic:task + liwc:task + value:task + #(1| model:task), REML=FALSE, data=test_df, control = lmerControl(optCtrl = list(maxfun = 1000000)))
+
+#h1.3 <- lmer(score_z ~ linguistic + topic + liwc + value + audio + topic:liwc + (1 | model:task) , REML=FALSE, data=test_df, #control = lmerControl(optCtrl = list(maxfun = 1000000)))
+
+#save(h1.1, file="h1.1.rda")
+#save(h1.2, file="h1.2.rda")
+#save(h1.3, file="h1.3.rda")
+
+load(here("models", "h1.1.rda"))
+load(here("models", "h1.2.rda"))
+load(here("models", "h1.3.rda"))
+
+anova(h1.1, h1.2, h1.3)
+```
+
+For the sake of completion, we test these against nested models. 
+```{r}
+#h2.1 <- lmer(score_z ~ linguistic + topic + liwc + value + task + audio + topic:liwc + topic:task + liwc:task + value:task + #(model|task/model), REML=FALSE, data=test_df, control = lmerControl(optCtrl = list(maxfun = 1000000)))
+
+#h2.2 <- lmer(score_z ~ linguistic + topic + liwc + value + task + audio + topic:liwc + topic:task + liwc:task + value:task + #(1|task/model), REML=FALSE, data=test_df, control = lmerControl(optCtrl = list(maxfun = 1000000)))
+
+#h2.3 <- lmer(score_z ~ linguistic + topic + liwc + value + audio + topic:liwc + (1 | task/model) , REML=FALSE, data=test_df, #control = lmerControl(optCtrl = list(maxfun = 1000000)))
+
+#save(h2.1, file="h2.1.rda")
+#save(h2.2, file="h2.2.rda")
+#save(h2.3, file="h2.3.rda")
+
+load(here("models", "h2.1.rda"))
+load(here("models", "h2.2.rda"))
+load(here("models", "h2.3.rda"))
+
+anova(h2.1, h2.2, h2.3)
+```
+
+From the two groups, the best fitting models are not significantly different. 
+```{r}
+anova(h2.2, h1.2)
+```
+
+```{r}
+check_model(h2.2)
+```
+
+
+
+```{r}
+summary(h2.2)
+```
+

@@ -1,0 +1,33 @@
+Given the structure of the data, we can plausibly estimate interactions of all combinations of fixed effects and task. Specifically, our feature sets are all represented as binary variables. For example, a four-way interaction represents the effect of all four variables being included. However, this is estimating a large number of terms that, if all included, would hamper interpretability. 
+
+Included in the lmerTest package (Kuznetsova et al.) is a step function. This function removes one term at a time, and tests the difference between models if it is left out:
+https://www.jstatsoft.org/index.php/jss/article/view/v082i13/v82i13.pdf
+
+
+#reduction of fixed effects
+```{r, results=FALSE}
+f0.1 <- lm(formula(m0.1,fixed.only=TRUE),              data=eval(getCall(m0.1)$data))
+step(f0.1)
+```
+The iterative reduction of fixed effects found the following forumula:
+score_z ~ liwc + value + task + audio + liwc:task + value:task
+
+```{r}
+#f1.0 <- lmer(score_z ~ liwc + value + task + audio + value:task + 
+#          (audio|task/model) +
+#          (linguistic+topic+liwc+audio|model), REML=FALSE, #data=test_df, control = lmerControl(optCtrl = list(maxfun = 100000)))
+load(here("models", "f1.0.rda"))
+```
+We can compare it to the best fitting model from the Random Effects iteration.
+```{r}
+anova(f1.0, m8.1)
+```
+#model diagnostics
+```{r}
+check_model(f1.0)
+```
+#model output
+```{r}
+summary(f1.0)
+```
+

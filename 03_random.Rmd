@@ -1,0 +1,212 @@
+Barr et al. argue that multi-level models should be maximally specified:
+10.1016/j.jml.2012.11.001.Random
+
+Bates et al. argue that the random effects should be iteratively reduced by comparing AIC/BIC indices:
+http://arxiv.org/abs/1506.04967. 
+
+We employ the Bates et al. procedure by specifying a maximal model, and remove variance components in groups based on which ones show the smallest contribution. When model fit begins to decrease after the removal of terms, we settle on the most parsimonious, yet best fitting model. In this run, we settled on the following specification, which shows a non-significant difference with the maximally specified model, but poorer fits when terms are removed. 
+
+```{r}
+#m8.1 <- lmer(score_z ~ (personality+linguistic+topic+liwc+value+task)^6 + audio +
+#               (audio|task/model) +
+#               (linguistic+topic+liwc+audio|model), REML=FALSE, data=test_df, control = lmerControl(optCtrl = list(maxfun = #100000)))
+load(here("models", "m8.1.rda"))
+```
+
+What follows is the complete procedure for iterative random effect reduction as per Bates et al. These models took a *very* long time to run, with the maximal model with correlated slopes and intercepts taking over a full day on our server. As such, we include them with this notebook so they can be loaded and compared.  
+#iterative reduction of random effects specification, starting with a maximal model
+```{r}
+#with correlated slopes and intercepts
+#m0.1 <- lmer(score_z ~ (personality+linguistic+topic+liwc+value+task)^6 + audio +
+#             (personality+linguistic+topic+liwc+value+task+audio+model|task/model) + 
+#             (personality+linguistic+topic+liwc+value+task+audio+model|task) + 
+#             (personality+linguistic+topic+liwc+value+task+audio+model|model), REML=FALSE, data=test_df, #control = lmerControl(optCtrl = list(maxfun = 100000)))
+
+#with un-correlated slopes and intercepts
+#m0.3 <- lmer(score_z ~ (personality+linguistic+topic+liwc+value+task)^6 + audio +
+#               (personality+linguistic+topic+liwc+value+task+audio+model||task/model) + 
+#               (personality+linguistic+topic+liwc+value+task+audio+model||task) + 
+#               (personality+linguistic+topic+liwc+value+task+audio+model||model), REML=FALSE, data=test_df, #control = lmerControl(optCtrl = list(maxfun = 100000)))
+```
+We exported the models from our server, and loaded them here. m0.3 is a nominally better fit than m0.1. 
+```{r}
+load(here("models", "m0.1.rda"))
+load(here("models", "m0.3.rda"))
+anova(m0.1, m0.3)
+```
+
+rePCA from the RePsychLing package performs a PCA on the random effects. Its authors, Bates et al., used it to show that not all random effects ought to be specified. We see a similar pattern as Bates et al., namely that not all the components contribute significantly to the variance. This suggests that many of the terms are not contributing meaningfully. 
+
+```{r}
+m0.3_pca <- rePCA(m0.3)
+summary(m0.3_pca)
+```
+From here, we employ and iterative reduction procedure on the random effects. Thus, we remove variance components in small groups based on which ones contribute the least to the variance. We performed two runs: in the first, we did not include the model as random slope due to the long processing time, but included it in the second run.  
+
+```{r}
+#original run, with task, but without model in the slopes
+#m1.0 <- lmer(score_z ~ (personality+linguistic+topic+liwc+value+task)^6 + audio +
+#               (linguistic+topic+liwc+value+task + audio|task/model) + 
+#               (personality+linguistic+task|task) + 
+#               (personality+linguistic+topic+liwc+value+task+ audio|model), REML=FALSE, data=test_df, control = lmerControl(optCtrl #= list(maxfun = 100000)))
+
+#second run, with model and task in the slopes
+#m1.1 <- lmer(score_z ~ (personality+linguistic+topic+liwc+value+task)^6 + audio +
+#               (topic+liwc+value+task+audio+model|task/model) +
+#               (linguistic+liwc+task+audio+model|task) +
+#               (personality+linguistic+topic+liwc+value+task+ audio|model), REML=FALSE, data=test_df, control = lmerControl(optCtrl #= list(maxfun = 100000)))
+
+#third run, without task or model in the slopes
+#m1.2 <- lmer(score_z ~ (personality+linguistic+topic+liwc+value+task)^6+audio+
+#               (topic+liwc+value+audio|task/model) +
+#               (linguistic+liwc+audio|task) +
+#               (personality+linguistic+topic+liwc+value+audio|model), REML=FALSE, data=test_df, control = lmerControl(optCtrl = #list(maxfun = 100000)))
+
+
+load(here("models", "m1.0.rda"))
+load(here("models", "m1.1.rda"))
+load(here("models", "m1.2.rda"))
+anova(m0.3, m1.0, m1.1, m1.2)
+```
+The best fitting model according to AIC and BIC is m1.2, in which we did not estimate slopes for model or task. 
+```{r}
+m1.2_pca <- rePCA(m1.2)
+summary(m1.2_pca)
+```
+Looking at the PCA, it still appears we can remove terms. 
+
+```{r}
+#m2.0 <- lmer(score_z ~ (personality+linguistic+topic+liwc+value+task)^6 + audio +
+#               (linguistic+topic+liwc+value+task + audio|task/model) + 
+#               (1|task) + 
+#               (personality+linguistic+topic+liwc+value+task+ audio|model), REML=FALSE, data=test_df, control = lmerControl(optCtrl #= list(maxfun = 100000)))
+load(here("models", "m2.0.rda"))
+anova(m2.0, m1.2)
+```
+
+1.2 is nominally better, but no significant difference. We remove more terms. We also assess a model where the slopes and intercepts are not correlated. 
+```{r}
+#m3.0 <- lmer(score_z ~ (personality+linguistic+topic+liwc+value+task)^6 + audio +
+#               (topic+liwc+value+task + audio|task/model) + 
+#               (1|task) + 
+#               (linguistic+topic+liwc+value+task+ audio|model), REML=FALSE, data=test_df, control = lmerControl(optCtrl = #list(maxfun = 100000)))
+
+#m3.1 <- lmer(score_z ~ (personality+linguistic+topic+liwc+value+task)^6 + audio +
+#               (topic+liwc+value+task + audio||task/model) + 
+#               (1|task) + 
+#               (linguistic+topic+liwc+value+task+ audio||model), REML=FALSE, data=test_df, control = lmerControl(optCtrl = #list(maxfun = 100000)))
+
+load(here("models", "m3.0.rda"))
+load(here("models", "m3.1.rda"))
+anova(m3.0, m3.1, m1.2)
+```
+1.2 is still better. We continue removing terms. 
+```{r}
+#m4.0 <- lmer(score_z ~ (personality+linguistic+topic+liwc+value+task)^6 + audio +
+#               (topic+liwc+task+audio||task/model) + 
+#               (1|task) + 
+#               (linguistic+topic+liwc+task+audio||model), REML=FALSE, data=test_df, control = lmerControl(optCtrl = list(maxfun = #100000)))
+
+#m4.1 <- lmer(score_z ~ (personality+linguistic+topic+liwc+value+task)^6 + audio +
+#               (topic+liwc+task+audio|task/model) + 
+#               (1|task) + 
+#               (linguistic+topic+liwc+task+audio|model), REML=FALSE, data=test_df, control = lmerControl(optCtrl = list(maxfun = #100000)))
+load(here("models", "m4.0.rda"))
+load(here("models", "m4.1.rda"))
+anova(m1.2, m4.0, m4.1)
+```
+1.2 is barely better than 4.1. We continue removing terms. 
+```{r}
+#m5.0 <- lmer(score_z ~ (personality+linguistic+topic+liwc+value+task)^6 + audio +
+#               (topic+liwc+audio|task/model) + 
+#               (1|task) + 
+#               (linguistic+topic+liwc+audio|model), REML=FALSE, data=test_df, control = lmerControl(optCtrl = list(maxfun = #100000)))
+load(here("models", "m5.0.rda"))
+anova(m1.2, m5.0, m4.1)
+```
+Model 5.0 is nominally better than both. We try versions with and without a slope estimated for topic within the task/model structure. 
+
+```{r}
+#m6.0 <- lmer(score_z ~ (personality+linguistic+topic+liwc+value+task)^6 + audio +
+#               (audio|task/model) + 
+#               (1|task) + 
+#               (liwc+audio|model), REML=FALSE, data=test_df, control = lmerControl(optCtrl = list(maxfun = 100000)))
+
+#m6.1 <- lmer(score_z ~ (personality+linguistic+topic+liwc+value+task)^6 + audio +
+#               (topic+audio|task/model) + 
+#               (1|task) + 
+#               (linguistic+topic+liwc+audio|model), REML=FALSE, data=test_df, control = lmerControl(optCtrl = list(maxfun = #100000)))
+load(here("models", "m6.0.rda"))
+load(here("models", "m6.1.rda"))
+anova(m5.0, m6.0, m6.1)
+```
+6.1 appears to be the strongest, although quite similar to 5.0. We now try removing the (1|task) term. 
+
+```{r}
+#m7.0 <- lmer(score_z ~ (personality+linguistic+topic+liwc+value+task)^6 + audio +
+#               (topic+audio|task/model) + 
+#               (linguistic+topic+liwc+audio|model), REML=FALSE, data=test_df, control = lmerControl(optCtrl = list(maxfun = #100000)))
+
+#m7.1 <- lmer(score_z ~ (personality+linguistic+topic+liwc+value+task)^6 + audio +
+#               (topic+audio||task/model) + 
+#               (linguistic+topic+liwc+audio||model), REML=FALSE, data=test_df, control = lmerControl(optCtrl = list(maxfun = #100000)))
+load(here("models", "m7.0.rda"))
+load(here("models", "m7.1.rda"))
+anova(m6.1, m7.0, m7.1)
+```
+6.1 and 7.0 are similar fits, with 7.0 nominally better. At this point, the models are simple enough to run locally. 
+
+```{r}
+#m8.0 <- lmer(score_z ~ (personality+linguistic+topic+liwc+value+task)^6 + audio +
+#               (topic+audio|task/model) + 
+#               (topic+liwc+audio|model), REML=FALSE, data=test_df, control = lmerControl(optCtrl = list(maxfun = 100000)))
+
+#m8.1 <- lmer(score_z ~ (personality+linguistic+topic+liwc+value+task)^6 + audio +
+#               (audio|task/model) +
+#               (linguistic+topic+liwc+audio|model), REML=FALSE, data=test_df, control = lmerControl(optCtrl = list(maxfun = #100000)))
+load(here("models", "m8.0.rda"))
+load(here("models", "m8.1.rda"))
+anova(m7.0, m8.0, m8.1)
+```
+Examining the PCA of the random effects of m8.1
+```{r}
+m8.1_pca <- rePCA(m8.1)
+summary(m8.1_pca)
+```
+It appears we could remove more components. 
+```{r, results=FALSE}
+summary(m8.1)
+```
+It appears that m8.1 fits better than m9.0, significantly. 
+```{r}
+#m9.0 <- lmer(score_z ~ (personality+linguistic+topic+liwc+value+task)^6 + audio +
+#               (audio|task/model) + 
+#               (liwc+audio|model), REML=FALSE, data=test_df, control = lmerControl(optCtrl = list(maxfun = 100000)))
+
+#save(m9.0, file="m9.0.rda")
+load(here("models", "m9.0.rda"))
+anova(m8.1, m9.0)
+```
+And fit decreases as we remove terms. 
+
+```{r}
+#m10.0 <- lmer(score_z ~ (personality+linguistic+topic+liwc+value+task)^6 + audio +
+#      (audio|task/model) + 
+#      (audio|model), REML=FALSE, data=test_df, control = lmerControl(optCtrl = list(maxfun = 100000)))
+
+#m10.1 <- lmer(score_z ~ (personality+linguistic+topic+liwc+value+task)^6 + audio +
+#      (1|task/model) + 
+#      (1|model), REML=FALSE, data=test_df, control = lmerControl(optCtrl = list(maxfun = 100000)))
+
+#save(m10.0, file="m10.0.rda")
+#save(m10.1, file="m10.1.rda")
+
+load(here("models", "m10.0.rda"))
+load(here("models", "m10.1.rda"))
+anova(m10.0, m10.1, m8.1)
+```
+Interestingly, model fit is not significantly different from our maximally specified model, although we have used far fewer terms. 
+```{r}
+anova(m8.1, m0.1)
+```
+

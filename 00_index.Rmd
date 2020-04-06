@@ -1,0 +1,72 @@
+---
+title: "lyricPsych analysis"
+author: "Andrew M. Demetriou"
+date: "3/31/2020"
+output:
+  html_document:
+    df_print: paged
+    toc: yes
+  html_notebook:
+    code_folding: hide
+    highlight: tango
+    theme: readable
+    toc: yes
+    toc_float: yes
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+load.lib <- c("rmarkdown", "dplyr", "broom", "ggplot2", "lme4", "lmerTest","boot", "gplots", "performance", "see", "here", "devtools", "effects")
+
+install.lib<-load.lib[!load.lib %in% installed.packages()]
+for(lib in install.lib) install.packages(lib,dependencies=TRUE)
+sapply(load.lib,require,character=TRUE)
+
+library(dplyr)
+library(broom)
+library(ggplot2)
+library(lme4)
+library(lmerTest)
+library(boot)
+library(gplots)
+library(performance)
+library(see)
+library(here)
+library(devtools)
+#devtools::install_github("dmbates/RePsychLing")
+library(RePsychLing)
+library(effects)
+
+cl <- parallel::makeCluster(rep("localhost", parallel::detectCores() - 1))
+```
+
+## import dataset and set up variables
+<!--- Child: read data -->
+```{r child = "01_data.Rmd"}
+```
+
+## exploratory analysis
+<!--- Child: read data -->
+```{r child = "02_explore.Rmd"}
+```
+
+## random effects reduction
+<!--- Child: read data -->
+```{r child = "03_random.Rmd"}
+```
+
+## fixed effects reduction
+<!--- Child: read data -->
+```{r child = "04_fixed.Rmd"}
+```
+
+## hypothesized model
+<!--- Child: read data -->
+```{r child = "05_hyp.Rmd"}
+```
+
+#fin
+```{r cleanup, echo=FALSE, message=FALSE, cache=FALSE}
+parallel::stopCluster(cl)
+```
