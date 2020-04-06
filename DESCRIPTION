@@ -1,0 +1,27 @@
+Type: Compendium
+Package: lyricpsych_analysis
+Title: Heirarchical LMM Analysis
+Version: 0.0.1
+Authors@R:
+	person(given = "Andrew", 
+	family = "Demetriou", 
+	role = c("aut", "cre"), 
+	email = "andrew.m.demetriou@gmail.com", 
+	comment = c(ORCID = "0000-0002-0724-2278"))
+Description: An analysis used in the lyricpsych project: Heriarchical LMM, with an iterative reduction of both random and fixed terms, with three versions of our response variable. 
+License: 
+Depends:
+	rmarkdown, 
+	dplyr, 
+	broom, 
+	ggplot2, 
+	lme4, 
+	lmerTest, 
+	boot, 
+	performance, 
+	see, 
+	here, 
+	devtools, 
+	RePsychLing
+Encoding: UTF-8
+LazyData: true
