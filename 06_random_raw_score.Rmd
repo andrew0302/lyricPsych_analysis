@@ -1,0 +1,38 @@
+---
+title: "06_random_raw_score"
+author: "Andrew M. Demetriou"
+date: "4/7/2020"
+output: html_document
+---
+
+```{r}
+load(here("models", "r2.0.rda"))
+```
+
+
+
+```{r}
+devfun <- update(r2.0, devFunOnly=TRUE)
+if (isLMM(r2.0)) {
+    pars <- getME(r2.0,"theta")
+} else {
+    ## GLMM: requires both random and fixed parameters
+    pars <- getME(r2.0, c("theta","fixef"))
+}
+if (require("numDeriv")) {
+    cat("hess:\n"); print(hess <- hessian(devfun, unlist(pars)))
+    cat("grad:\n"); print(grad <- grad(devfun, unlist(pars)))
+    cat("scaled gradient:\n")
+    print(scgrad <- solve(chol(hess), grad))
+}
+```
+
+## Including Plots
+
+You can also embed plots, for example:
+
+```{r pressure, echo=FALSE}
+plot(pressure)
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.

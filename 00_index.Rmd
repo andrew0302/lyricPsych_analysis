@@ -36,7 +36,6 @@ library(here)
 library(devtools)
 #devtools::install_github("dmbates/RePsychLing")
 library(RePsychLing)
-library(effects)
 
 cl <- parallel::makeCluster(rep("localhost", parallel::detectCores() - 1))
 ```
