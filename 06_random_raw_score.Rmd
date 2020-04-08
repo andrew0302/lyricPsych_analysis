@@ -5,13 +5,47 @@ date: "4/7/2020"
 output: html_document
 ---
 
+Maximal model with raw score:
+
 ```{r}
+#r0.1 <- lmer(score ~ (personality+linguistic+topic+liwc+value+task)^6 + audio +
+#               (personality+linguistic+topic+liwc+value+task+audio+model|task/mode#l) + 
+#               (personality+linguistic+topic+liwc+value+task+audio+model|model), #REML=FALSE, data=test_df, control = lmerControl(optCtrl = list(maxfun = 100000)))
+load(here("models", "r0.1.rda"))
+```
+
+First reduction
+
+```{r}
+#r1.0 <- lmer(score ~ (personality+linguistic+topic+liwc+value+task)^6 + audio +
+#                     (personality+topic+liwc+value+task+audio+model|task:model) +
+#                     (liwc+task+audio+model|task) + 
+#                   (personality+linguistic+topic+liwc+value+task+audio+model|model), REML=FALSE, #data=test_df, control = lmerControl(optCtrl = list(maxfun = 100000)))
+load(here("models", "r1.0.rda"))
+```
+
+This model doesn't converge; errors report hessian issues
+
+```{r}
+#r2.0 <- lmer(score ~ (personality+linguistic+topic+liwc+value+task)^6 + audio +
+#               (topic+liwc+value+task+audio+model|task:model) +   
+#               (task+audio+model|task) + 
+#               (liwc+value+task+audio+model|model), REML=FALSE, data=test_df, #control = lmerControl(optCtrl = list(maxfun = 1000000)))
+
 load(here("models", "r2.0.rda"))
 ```
 
-
+Following this documentation to assess convergence:
+https://rdrr.io/cran/lme4/man/convergence.html
 
 ```{r}
+#1 Decrease stopping tolerances
+strict_tol <- lmerControl(optCtrl=list(xtol_abs=1e-8, ftol_abs=1e-8))
+if (all(r2.0@optinfo$optimizer=="nloptwrap")) {
+  r2.0.tol <- update(r2.0, control=strict_tol)
+}
+
+#2 recomupting gradiant and Hessian with Richardson extrapolation
 devfun <- update(r2.0, devFunOnly=TRUE)
 if (isLMM(r2.0)) {
     pars <- getME(r2.0,"theta")
@@ -25,14 +59,27 @@ if (require("numDeriv")) {
     cat("scaled gradient:\n")
     print(scgrad <- solve(chol(hess), grad))
 }
+
+#compare output to internal calculations
+r2.0.tol@optinfo$derivs
+
+#3. restart the fit from the original value (or a slightly perturbed value):
+r2.0.restart <- update(r2.0.tol, start=pars)
+set.seed(101)
+pars_x <- runif(length(pars),pars/1.01,pars*1.01)
+r2.0.tol.restart2 <- update(r2.0.tol, start=pars_x,
+                       control=strict_tol)
 ```
 
-## Including Plots
+All solutions error out. Centering scores without standardizing:
 
-You can also embed plots, for example:
+```{r}
+center <- function(x) {
+  scale(x, scale=FALSE)
+}
 
-```{r pressure, echo=FALSE}
-plot(pressure)
+test_df <- 
+  test_df %>%
+  mutate(score_center = center(score))
 ```
 
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
