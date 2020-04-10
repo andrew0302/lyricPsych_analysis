@@ -9,7 +9,7 @@ output:
     code_folding: hide
 ---
 
-```{r setup}
+```{r setup, results=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 
 library(dplyr)
@@ -27,7 +27,7 @@ library(here)
 
 
 
-```{r dataset}
+```{r dataset, results=FALSE}
 df <- read.csv(here("data_", "lyrics_runs.csv"))
 test_df <- df %>% filter(personality=="True"|topic=="True"|linguistic=="True"|liwc=="True"|value=="True"|audio=="True")
 
@@ -54,7 +54,7 @@ test_df$dimension_number <- (test_df$personality*5+test_df$topic*25+test_df$ling
 lapply(test_df[,c('personality', 'topic', 'value', 'audio', 'linguistic', 'liwc')], as.factor)
 ```
 
-```{r}
+```{r, results=FALSE}
 #standardize score within task
 test_df <- 
   test_df %>%
@@ -83,6 +83,7 @@ Our goal is to evaluate whether including the feature sets is useful, based on e
 
 The distributions look skewed, and the skew seems to vary both by task and model. We tried standardizing within task, and we tried applying the logit function to the raw score. 
 
+Histograms showing raw score, standardized score, and logit score within each system:
 ```{r}
 ggplot(test_df, aes(x = score, color = model, fill=model)) +
   geom_histogram(bins = 1000) +
@@ -97,6 +98,7 @@ ggplot(test_df, aes(x = score_log, color = model, fill=model)) +
   facet_wrap(~model)
 ```
 
+Histograms showing raw score, standardized score, and logit score within each task:
 ```{r, echo=FALSE}
 ggplot(test_df, aes(x = score, color = task, fill=task)) +
   geom_histogram(bins = 50) +
@@ -110,7 +112,7 @@ ggplot(test_df, aes(x = score_log, color = task, fill=task)) +
   geom_histogram(bins = 50) +
   facet_wrap(~task)
 ```
-
+95% CI for each model, within each task, for the raw score, standardized score, and logit score respectively:
 ```{r}
 alpha <- .05
 ci_score <- 
@@ -153,6 +155,44 @@ ci_score_log %>%
 
 ```
 
+However, our attempts to run the models with either the raw score or the logit of the raw score resulted in models not converging (i.e. Hessian issues, or negative eigenvalues). We consulted this site for strategies to converge the models (beyond simply increasing the number of iterations): https://rdrr.io/cran/lme4/man/convergence.html
+
+All attempts resulted in similar errors. See sample code below:
+
+```{r}
+#decrease stopping tolerance
+#strict_tol <- lmerControl(optCtrl=list(xtol_abs=1e-8, ftol_abs=1e-8))
+#if (all(l0.2@optinfo$optimizer=="nloptwrap")) {
+#  l0.2.tol <- update(l0.2, control=strict_tol)
+  
+#recompute Hessian and gradient
+#  devfun <- update(l0.2.tol, devFunOnly=TRUE)
+#if (isLMM(l0.2.tol)) {
+#  pars <- getME(l0.2.tol,"theta")
+#} else {
+#  ## GLMM: requires both random and fixed parameters
+#  pars <- getME(l0.2.tol, c("theta","fixef"))
+#}
+#if (require("numDeriv")) {
+#  cat("hess:\n"); print(hess <- hessian(devfun, unlist(pars)))
+#  cat("grad:\n"); print(grad <- grad(devfun, unlist(pars)))
+#  cat("scaled gradient:\n")
+#  print(scgrad <- solve(chol(hess), grad))
+#}
+  
+#restart the fit
+#  l0.2.restart <- update(l0.2.tol, start=pars)
+#set.seed(101)
+#pars_x <- runif(length(pars),pars/1.01,pars*1.01)
+#l0.2.tol.restart2 <- update(l0.2.tol, start=pars_x,
+#                            control=strict_tol)
+#} 
+```
+
+The most successful strategy was centering and scaling the response variable. Are we now justified in proceeding with only this treatment of the response variable?
+
+
+
 ## question 2: how do we decide how to specify the models?
 
 We started by running models on the scores that were standardized within task. Firstly, do we still specify task as a fixed effect? We do want to know the effect of the interaction between task and various features on the score. 
@@ -162,12 +202,14 @@ We also came across two ways of dealing with the flexibility of specifying heira
 Barr et al. argue that multi-level models should be maximally specified:
 10.1016/j.jml.2012.11.001.Random 
 
-Bates et al. argue that the random effects should be iteratively reduced by comparing AIC/BIC indices:
+Bates et al. argue that the random effects should be maximally specified and then iteratively reduced comparing AIC/BIC indices:
 http://arxiv.org/abs/1506.04967. 
 
 We employ the Bates et al. procedure by specifying a maximal model, and remove variance components in groups based on which ones show the smallest contribution. When model fit begins to decrease after the removal of terms, we settle on the most parsimonious, yet best fitting model. We then use the step() function from the lmerTest package to automatically run a similar procedure on the fixed effects. 
 
-We also had a model that we had specified before running the experiment. 
+We also had a model that we had specified based on the structure of the data before running the experiment. As each of the feature sets is a binary variable indicating whether or not it had been used in the trial to gather the score, we specify the fixed effects of the maximal model as each of the feature sets (personality, values, liwc, linguistic, topic), the specific task, the six way interaction between the feature sets and task. The random intercepts are specified as the task, the system used (referred to as "model" in the dataset), and the interaction between task and model. The random slopes are specified as the five feature sets + task, as per Bates et al. We use the Bates et al procedure to reduce the random effects structure. We used a "leave one out" process for the fixed effects, by using the "step" function in the lmerTest package. 
+
+This process results in three models:
 
 ```{r}
 #maximal model
@@ -176,20 +218,19 @@ load(here("models", "m0.1.rda"))
 #model after random and fixed parameter elimination procedures
 load(here("models", "f1.0.rda"))
 
-#our hypothesized model
+#our hypothesized model, with fixed parameter elimination procedure
 load(here("models", "h2.2.rda"))
 
-anova(m0.1, f1.0)
+anova(m0.1, f1.0, h2.2)
 ```
+
+Which model to we interpret? Or do we report all three?
+
 
 ## question 3: how do we interpret models that have diagnostic issues?
 
-Looking at the Q-Q plot we see sharp curves at the beginning and end of the line. We also see some issues with homoscdasticity and homogeneity of variance. 
+Looking at the Q-Q plot we see sharp curves at the beginning and end of the line. We also see some issues with homoscdasticity and homogeneity of variance. How do we correctly interpret the model, given the following issues?
 
 ```{r}
 check_model(f1.0)
 ```
-
-## question 4: how do we deal with models not converging - e.g. negative eigenvalues?
-
-We're now considering a multiverse analysis, using the same parameter elimination procedures, starting with the raw scores. However, while implementing the procedure to reduce random effects parameters, we see model errors. Should we continue with the procedure? Or perform some other operation to get the model to converge before examining variance components for elimination?
