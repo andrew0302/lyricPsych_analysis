@@ -192,10 +192,17 @@ All attempts resulted in similar errors. See sample code below:
 The most successful strategy was centering and scaling the response variable. Are we now justified in proceeding with only this treatment of the response variable?
 
 
+## question 2: how do we decide how to specify the random slopes of the models?
 
-## question 2: how do we decide how to specify the models?
 
-We started by running models on the scores that were standardized within task. Firstly, do we still specify task as a fixed effect? We do want to know the effect of the interaction between task and various features on the score. 
+Firstly, we specify a random structure based on what we know about the structure of the data. We know that each task represents a grouping, and that each model represents a grouping within each task. So we specify these as random intercepts. Further, we know that some models are only present within one task, so we also specify an interaction in the random effects to indicate this nested structure:
+
+1 + (1|task), 1 + (1|model), 1 + (1|task:model)
+
+We further want to estimate task as a fixed effect, because we expect that some feature sets will peform better on some tasks. Therefore, we would like to compute interactions between task and fixed effects. However, it's not clear if we should also specify task and/or model as a random slope as well. 
+
+
+## question 3: how do we decide which model to interpret?
 
 We also came across two ways of dealing with the flexibility of specifying heirarchical models:
 
@@ -208,6 +215,7 @@ http://arxiv.org/abs/1506.04967.
 We employ the Bates et al. procedure by specifying a maximal model, and remove variance components in groups based on which ones show the smallest contribution. When model fit begins to decrease after the removal of terms, we settle on the most parsimonious, yet best fitting model. We then use the step() function from the lmerTest package to automatically run a similar procedure on the fixed effects. 
 
 We also had a model that we had specified based on the structure of the data before running the experiment. As each of the feature sets is a binary variable indicating whether or not it had been used in the trial to gather the score, we specify the fixed effects of the maximal model as each of the feature sets (personality, values, liwc, linguistic, topic), the specific task, the six way interaction between the feature sets and task. The random intercepts are specified as the task, the system used (referred to as "model" in the dataset), and the interaction between task and model. The random slopes are specified as the five feature sets + task, as per Bates et al. We use the Bates et al procedure to reduce the random effects structure. We used a "leave one out" process for the fixed effects, by using the "step" function in the lmerTest package. 
+
 
 This process results in three models:
 
@@ -227,7 +235,7 @@ anova(m0.1, f1.0, h2.2)
 Which model to we interpret? Or do we report all three?
 
 
-## question 3: how do we interpret models that have diagnostic issues?
+## question 4: how do we interpret models that have diagnostic issues?
 
 Looking at the Q-Q plot we see sharp curves at the beginning and end of the line. We also see some issues with homoscdasticity and homogeneity of variance. How do we correctly interpret the model, given the following issues?
 

@@ -9,7 +9,7 @@ Maximal model with raw score:
 
 ```{r}
 #r0.1 <- lmer(score ~ (personality+linguistic+topic+liwc+value+task)^6 + audio +
-#               (personality+linguistic+topic+liwc+value+task+audio+model|task/mode#l) + 
+#               (personality+linguistic+topic+liwc+value+task+audio+model|task/model) + 
 #               (personality+linguistic+topic+liwc+value+task+audio+model|model), #REML=FALSE, data=test_df, control = lmerControl(optCtrl = list(maxfun = 100000)))
 load(here("models", "r0.1.rda"))
 ```

@@ -40,8 +40,6 @@ We add two columns for exploratory analysis, one representing the number of feat
 test_df$feature_number <- (test_df$personality+test_df$topic+test_df$linguistic+test_df$liwc+test_df$value+test_df$audio)
 
 test_df$dimension_number <- (test_df$personality*5+test_df$topic*25+test_df$linguistic*9+test_df$liwc*72+test_df$value*49+test_df$audio*240)
-
-
 ```
 
 ```{r, results=FALSE}

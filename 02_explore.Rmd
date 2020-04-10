@@ -8,13 +8,13 @@ test_df <-
   group_by(task) %>%
   mutate(score_z = scale(score))
 
-#log
+#logit of raw score
 test_df <-
   test_df %>%
   mutate(score_log = logit(score))
 ```
 
-The process improved the look of the distributions, both within each model, and within each task:
+The standardization process improved the look of the distributions, both within each model, and within each task.
 
 ```{r}
 ## compare the data by model, before and after adjustments
@@ -32,9 +32,25 @@ ggplot(test_df, aes(x = score_log, color = model, fill=model)) +
 
 ```
 
+Checking for outliers:
+
+```{r}
+test_df %>% 
+  group_by(task, model) %>%
+  ggplot(aes(x = task, y =score_z, fill = model)) +
+  geom_boxplot()
+
+test_df %>%
+  filter(task == "auto_tag") %>%
+  ggplot(aes(x = task, y =score_z, fill = model)) +
+  geom_boxplot()
+```
+
+WRMF and FM have what look like outliers. Removing all scores above 3.5:
+
 ```{r}
 #test_df <- test_df %>% 
-#  filter(score_z < 3.5)
+  filter(score_z < 3.5)
 ```
 
 ```{r}

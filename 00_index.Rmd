@@ -65,6 +65,11 @@ cl <- parallel::makeCluster(rep("localhost", parallel::detectCores() - 1))
 ```{r child = "05_hyp.Rmd"}
 ```
 
+## raw score and logit models
+<!--- Child: read data -->
+```{r child = "06_raw_and_logit.Rmd"}
+```
+
 #fin
 ```{r cleanup, echo=FALSE, message=FALSE, cache=FALSE}
 parallel::stopCluster(cl)
