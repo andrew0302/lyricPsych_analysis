@@ -76,6 +76,7 @@ The columns "personality", "liwc", "topic", "value", "linguistic" and "audio" re
 ```{r head}
 head(df)
 ```
+![diagram of data structure](image.png)
 
 ## question 1: should we adjust the response variable? and if so, what approach should we take?
 
