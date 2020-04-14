@@ -37,6 +37,26 @@ Checking for outliers:
 ```{r}
 test_df %>% 
   group_by(task, model) %>%
+  ggplot(aes(x = task, y =score, fill = model)) +
+  geom_boxplot()
+
+test_df %>%
+  filter(task == "auto_tag") %>%
+  ggplot(aes(x = task, y =score, fill = model)) +
+  geom_boxplot()
+
+test_df %>% 
+  group_by(task, model) %>%
+  ggplot(aes(x = task, y =score_log, fill = model)) +
+  geom_boxplot()
+
+test_df %>%
+  filter(task == "auto_tag") %>%
+  ggplot(aes(x = task, y =score_log, fill = model)) +
+  geom_boxplot()
+
+test_df %>% 
+  group_by(task, model) %>%
   ggplot(aes(x = task, y =score_z, fill = model)) +
   geom_boxplot()
 
@@ -49,7 +69,7 @@ test_df %>%
 WRMF and FM have what look like outliers. Removing all scores above 3.5:
 
 ```{r}
-#test_df <- test_df %>% 
+test_df <- test_df %>% 
   filter(score_z < 3.5)
 ```
 

@@ -17,7 +17,7 @@ output:
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 
-load.lib <- c("rmarkdown", "dplyr", "broom", "ggplot2", "lme4", "lmerTest","boot", "gplots", "performance", "see", "here", "devtools", "effects")
+load.lib <- c("rmarkdown", "dplyr", "broom", "ggplot2", "lme4", "lmerTest","boot", "gplots", "performance", "see", "here", "devtools")
 
 install.lib<-load.lib[!load.lib %in% installed.packages()]
 for(lib in install.lib) install.packages(lib,dependencies=TRUE)
@@ -50,7 +50,7 @@ cl <- parallel::makeCluster(rep("localhost", parallel::detectCores() - 1))
 ```{r child = "02_explore.Rmd"}
 ```
 
-## random effects reduction
+## example random effects reduction
 <!--- Child: read data -->
 ```{r child = "03_random.Rmd"}
 ```
@@ -63,11 +63,6 @@ cl <- parallel::makeCluster(rep("localhost", parallel::detectCores() - 1))
 ## hypothesized model
 <!--- Child: read data -->
 ```{r child = "05_hyp.Rmd"}
-```
-
-## raw score and logit models
-<!--- Child: read data -->
-```{r child = "06_raw_and_logit.Rmd"}
 ```
 
 #fin

@@ -13,7 +13,8 @@ We employ the Bates et al. procedure by specifying a maximal model, and remove v
 load(here("models", "m8.1.rda"))
 ```
 
-What follows is the complete procedure for iterative random effect reduction as per Bates et al. These models took a *very* long time to run, with the maximal model with correlated slopes and intercepts taking over a full day on our server. As such, we include them with this notebook so they can be loaded and compared.  
+What follows is one complete procedure for iterative random effect reduction as per Bates et al. These models took a *very* long time to run, with the maximal model with correlated slopes and intercepts taking over a full day on our server. As such, we include them with this notebook so they can be loaded and compared. We went through a process like this one several times, once for each treatment of the response variable. This was our first run. The rest can be found as separate scripts in the folder. 
+
 #iterative reduction of random effects specification, starting with a maximal model
 ```{r, echo=FALSE}
 #with correlated slopes and intercepts
