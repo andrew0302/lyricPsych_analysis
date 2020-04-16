@@ -3,31 +3,34 @@ Given the structure of the data, we can plausibly estimate interactions of all c
 Included in the lmerTest package (Kuznetsova et al.) is a step function. This function removes one term at a time, and tests the difference between models if it is left out:
 https://www.jstatsoft.org/index.php/jss/article/view/v082i13/v82i13.pdf
 
+The stepping procedure only looked at the fixed effects; as such, the fixed effect structure would be the same for all random effect structures, of a response variable treatment. 
 
-#reduction of fixed effects
-```{r, results=FALSE}
-f0.1 <- lm(formula(m0.1,fixed.only=TRUE),              data=eval(getCall(m0.1)$data))
-step(f0.1)
-```
+#reduction of fixed effects for standardized score
 The iterative reduction of fixed effects found the following forumula:
 score_z ~ liwc + value + task + audio + liwc:task + value:task
+```{r, results=FALSE}
+load(here("models", "m8.1.rda"))
+f0.1 <- lm(formula(m8.1,fixed.only=TRUE), data=eval(getCall(m8.1)$data))
+step(f0.1)
+```
 
-```{r}
-#f1.0 <- lmer(score_z ~ liwc + value + task + audio + value:task + 
-#          (audio|task/model) +
-#          (linguistic+topic+liwc+audio|model), REML=FALSE, #data=test_df, control = lmerControl(optCtrl = list(maxfun = 100000)))
-load(here("models", "f1.0.rda"))
+#reduction of fixed effects for logit score
+The iterative reduction of fixed effects found the following forumula:
+score_log ~ liwc + value + task + audio + liwc:value + liwc:task + value:task + liwc:value:task
+    
+```{r, results=FALSE}
+load(here("models", "l8.4.rda"))
+f1.1 <- lm(formula(l8.4,fixed.only=TRUE), data=eval(getCall(l8.4)$data))
+step(f1.1)
 ```
-We can compare it to the best fitting model from the Random Effects iteration.
-```{r}
-anova(f1.0, m8.1)
-```
-#model diagnostics
-```{r}
-check_model(f1.0)
-```
-#model output
-```{r}
-summary(f1.0)
+
+#reduction of fixed effects for raw score
+The iterative reduction of fixed effects found the following forumula:
+score ~ liwc + task + audio + liwc:task
+
+```{r, results=FALSE}
+load(here("models", "r0.1.rda"))
+f2.1 <- lm(formula(r0.1,fixed.only=TRUE), data=eval(getCall(r0.1)$data))
+step(f2.1)
 ```
 

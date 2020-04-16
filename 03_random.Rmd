@@ -6,10 +6,12 @@ http://arxiv.org/abs/1506.04967.
 
 We employ the Bates et al. procedure by specifying a maximal model, and remove variance components in groups based on which ones show the smallest contribution. When model fit begins to decrease after the removal of terms, we settle on the most parsimonious, yet best fitting model. In this run, we settled on the following specification, which shows a non-significant difference with the maximally specified model, but poorer fits when terms are removed. 
 
+
+This was the resulting model specification for this run:
 ```{r}
 #m8.1 <- lmer(score_z ~ (personality+linguistic+topic+liwc+value+task)^6 + audio +
 #               (audio|task/model) +
-#               (linguistic+topic+liwc+audio|model), REML=FALSE, data=test_df, control = lmerControl(optCtrl = list(maxfun = #100000)))
+#               (linguistic+topic+liwc+audio|model), REML=FALSE, data=test_df, control = lmerControl(optCtrl = list(maxfun = 100000)))
 load(here("models", "m8.1.rda"))
 ```
 
@@ -206,7 +208,7 @@ load(here("models", "m10.0.rda"))
 load(here("models", "m10.1.rda"))
 anova(m10.0, m10.1, m8.1)
 ```
-Interestingly, model fit is not significantly different from our maximally specified model, although we have used far fewer terms. 
+Model fit is not significantly different from our maximally specified model, although we have used far fewer terms. 
 ```{r}
 anova(m8.1, m0.1)
 ```
