@@ -1,77 +1,114 @@
-if (!require(tidyverse)) {
-  install.packages('tidyverse')
-}
-if (!require(purrr)) {
-  install.packages('purrr')
-}
-if (!require(broom)) {
-  install.packages('broom')
-}
-if (!require(cowplot)) {
-  install.packages('cowplot')
-}
-if (!require(sjPlot)) {
-  install.packages('sjPlot')
-}
-if (!require(specr)) {
-  install.packages('specr')
-}
-
-
 library(tidyverse)
 library(purrr)
 library(broom.mixed)
 library(sjPlot)
 library(cowplot)
-library(specr)
-library(MuMIn)
+library(lme4)
+library(lmerTest)
+library(here)
+library(Hmisc)
+
+###
+df <- read.csv(here("data_", "lyrics_runs.csv"))
+test_df <- df %>% filter(personality=="True"|topic=="True"|linguistic=="True"|liwc=="True"|value=="True"|audio=="True")
+
+#convert "True" and "False" to 1 and 0 respectively, for analysis
+TrueFalseToNumbers <- function(x, print=TRUE){
+  x <- as.character(x)
+  x <- replace(x, x=="True", "1")
+  x <- replace(x, x=="False", "0")
+  x <- as.numeric(x)
+  return(x)
+}
+
+test_df$personality <- TrueFalseToNumbers(test_df$personality)
+test_df$liwc <- TrueFalseToNumbers(test_df$liwc)
+test_df$topic <- TrueFalseToNumbers(test_df$topic)
+test_df$value <- TrueFalseToNumbers(test_df$value)
+test_df$linguistic <- TrueFalseToNumbers(test_df$linguistic)
+test_df$audio <- TrueFalseToNumbers(test_df$audio)
+
+test_df$feature_number <- (test_df$personality+test_df$topic+test_df$linguistic+test_df$liwc+test_df$value+test_df$audio)
+
+test_df$dimension_number <- (test_df$personality*5+test_df$topic*25+test_df$linguistic*9+test_df$liwc*72+test_df$value*49+test_df$audio*240)
+
+lapply(test_df[,c('personality', 'topic', 'value', 'audio', 'linguistic', 'liwc')], as.factor)
+
+####
+test_df <- 
+  test_df %>%
+  group_by(task) %>%
+  mutate(score_z = scale(score))
 
 
-m8.4 <- lmer(score_z ~ (personality+linguistic+topic+liwc+value+task)^6 + audio +
-               (audio|model:task) + 
-               (audio|task) + 
-               (topic+liwc+audio|model), REML=FALSE, data=test_df, control = lmerControl(optCtrl = list(maxfun = 100000)))
-
-m8.3 <- lmer(score_z ~ (personality+linguistic+topic+liwc+value+task)^6 + audio +
-               (audio|model:task) + 
-               (audio|task) + 
-               (linguistic+topic+liwc+audio|model), REML=FALSE, data=test_df, control = lmerControl(optCtrl = list(maxfun = 100000)))
-
-m7.2 <- lmer(score_z ~ (personality+linguistic+topic+liwc+value+task)^6 + audio +
-               (liwc+audio|model:task) + 
-               (audio|task) + 
-               (linguistic+topic+liwc+audio|model), REML=FALSE, data=test_df, control = lmerControl(optCtrl = list(maxfun = 100000)))
-
-m8.1 <- lmer(score_z ~ (personality+linguistic+topic+liwc+value+task)^6 + audio +
-               (1|model:task) + 
-               (1|task) + 
-               (liwc+audio|model), REML=FALSE, data=test_df, control = lmerControl(optCtrl = list(maxfun = 100000)))
-
-
-# attempt 1
-# specify models
-models =list(score ~ (1|task/model), 
-             score_z ~ personality + topic + liwc + value + task + audio + liwc:task + value:task + (1|task/model),
-             score_z ~ personality + topic + liwc + value + task + audio + liwc:task + value:task + (audio|model:task) + (audio|task) + (topic+liwc+audio|model),
-             score_z ~ personality + topic + liwc + value + task + audio + liwc:task + value:task + (audio|model:task) + (audio|task) + (linguistic+topic+liwc+audio|model),
-             score_z ~ personality + topic + liwc + value + task + audio + liwc:task + value:task + (liwc+audio|model:task) + (audio|task) + (linguistic+topic+liwc+audio|model),
+#specify models
+models_stan =list(score_z ~ personality + topic + liwc + value + task + audio + liwc:task + value:task + (1|task/model),
+             score_z ~ personality + topic + liwc + value + task + audio + liwc:task + value:task + (audio|task:model) + (audio|task) + (topic+liwc+audio|model),
+             score_z ~ personality + topic + liwc + value + task + audio + liwc:task + value:task + (audio|task:model) + (audio|task) + (linguistic+topic+liwc+audio|model),
+             score_z ~ personality + topic + liwc + value + task + audio + liwc:task + value:task + (liwc+audio|task:model) + (audio|task) + (linguistic+topic+liwc+audio|model),
              score_z ~ personality + topic + liwc + value + task + audio + liwc:task + value:task + (1|model:task) + (1|task) + (liwc+audio|model)
 )
 
+models_raw  =list(score ~ personality + topic + liwc + value + task + audio + liwc:task + value:task + (1|task/model),
+                   score ~ personality + topic + liwc + value + task + audio + liwc:task + value:task + (audio|task:model) + (audio|task) + (topic+liwc+audio|model),
+                   score ~ personality + topic + liwc + value + task + audio + liwc:task + value:task + (audio|task:model) + (audio|task) + (linguistic+topic+liwc+audio|model),
+                   score ~ personality + topic + liwc + value + task + audio + liwc:task + value:task + (liwc+audio|task:model) + (audio|task) + (linguistic+topic+liwc+audio|model),
+                   score ~ personality + topic + liwc + value + task + audio + liwc:task + value:task + (1|model:task) + (1|task) + (liwc+audio|model)
+)
+
+
 # run models and extract parameter estimates and stats
-model_params = map(models, ~lmer(.x, REML=FALSE, data=test_df, control = lmerControl(optCtrl = list(maxfun = 100000)))) %>%
+model_params_stan = map(models_stan, ~lmer(.x, REML=FALSE, data=test_df, control = lmerControl(optCtrl = list(maxfun = 100000)))) %>%
   tibble() %>%
   rename("model" = ".") %>%
   mutate(tidied = purrr::map(model, broom::tidy),
          model_num = row_number()) %>%
   select(model_num, tidied) %>%
   unnest()
+model_params_stan$dv = "standardized"
 
-model_params <- model_params %>% 
+model_params_raw = map(models_raw, ~lmer(.x, REML=FALSE, data=test_df, control = lmerControl(optCtrl = list(maxfun = 100000)))) %>%
+  tibble() %>%
+  rename("model" = ".") %>%
+  mutate(tidied = purrr::map(model, broom::tidy),
+         model_num = length(models_stan)+ row_number()) %>%
+  select(model_num, tidied) %>%
+  unnest()
+model_params_raw$dv = "raw"
+
+#merge dfs
+model_params = rbind(model_params_raw, model_params_stan)
+
+#create df with fixed and random parameter estimates
+fixed_params <- model_params %>% 
   filter(effect=="fixed")
+ran_params <- model_params %>% 
+  filter(effect=="ran_pars")
+ran_params$term <- paste(ran_params$group, "_", ran_params$term)
+all_params <- rbind(ran_params, fixed_params)
 
-# run models and extract model fits
-model_fits = purrr::map(models, ~lmer(.x, REML=FALSE, data=test_df, control = lmerControl(optCtrl = list(maxfun = 100000)))) %>%
+
+top = all_params %>%
+#  filter(term=="value"|term=="liwc"|term=="audio"|term=="personality"|term=="topic"|term=="linguistic") %>%
+  filter(term=="value"|term=="liwc"|term=="audio") %>%
+  ggplot(aes(model_num, estimate, color = term)) +
+  geom_point(shape = "|", size = 4) +
+  labs(x = "", y = "regression coefficient\n") + 
+  theme_minimal(base_size = 11) +
+  scale_x_continuous(breaks = seq(1, 10, by= 1)) +
+  theme(legend.title = element_text(size = 10),
+        legend.text = element_text(size = 9),
+        axis.text = element_text(color = "black"),
+        axis.line = element_line(colour = "black"),
+        legend.position = "none",
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        panel.border = element_blank(),
+        panel.background = element_blank())
+top
+
+
+model_fits_stan = purrr::map(models_stan, ~lmer(.x, REML=FALSE, data=test_df, control = lmerControl(optCtrl = list(maxfun = 100000)))) %>%
   tibble() %>%
   rename("model" = ".") %>%
   mutate(model_num = row_number(),
@@ -79,68 +116,88 @@ model_fits = purrr::map(models, ~lmer(.x, REML=FALSE, data=test_df, control = lm
          BIC = map_dbl(model, BIC)) %>%
   select(-model)
 
+model_fits_raw = purrr::map(models_raw, ~lmer(.x, REML=FALSE, data=test_df, control = lmerControl(optCtrl = list(maxfun = 100000)))) %>%
+  tibble() %>%
+  rename("model" = ".") %>%
+  mutate(model_num = (length(models_stan)+ row_number()),
+         AIC = map_dbl(model, AIC),
+         BIC = map_dbl(model, BIC)) %>%
+  select(-model)
+
+model_fits_all <- rbind(model_fits_stan, model_fits_raw)
+
 # join dataframes and select model fits and parameter estimates
-(models.sca = model_params %>%
+(models.sca = all_params %>%
     select(model_num, term, estimate) %>%
     spread(term, estimate) %>%
-    left_join(., model_fits) %>%
+    left_join(., model_fits_all) %>%
     arrange(AIC)%>%
     select(AIC, BIC, everything()))
 
-# specify null model
-null.df = models.sca %>% 
-  filter(model_num == 1)
+#models.sca$dv <- as.factor(models.sca$dv)
 
-# tidy for plotting
-plot.data = models.sca %>%
-  arrange(AIC) %>%
-  mutate(specification = row_number(),
-         better.fit = ifelse(AIC == null.df$AIC, "equal", 
-                             ifelse(AIC < null.df$AIC, "yes","no")))
+variable.names = names(select(models.sca, -model_num, -AIC, -BIC))
 
-# get names of variables included in model
-variable.names = names(select(plot.data, -model_num, -starts_with("better"), -specification, -AIC, -BIC))
 
-# plot top panel
-top = plot.data %>%
-  ggplot(aes(specification, AIC, color = better.fit)) +
-  geom_point(shape = "|", size = 4) +
-  geom_hline(yintercept = null.df$AIC, linetype = "dashed", color = "lightblue")+
-  scale_color_manual(values = c("lightblue","black", "red")) +
-  labs(x = "", y = "AIC\n") + 
-  theme_minimal(base_size = 11) +
-  theme(legend.title = element_text(size = 10),
-        legend.text = element_text(size = 9),
-        axis.text = element_text(color = "black"),
-        axis.line = element_line(colour = "black"),
-        legend.position = "none",
-        panel.grid.major = element_blank(),
-        panel.grid.minor = element_blank(),
-        panel.border = element_blank(),
-        panel.background = element_blank())
-
-# plot bottom panel
-bottom = plot.data %>%
+bottom = models.sca %>%
   gather(variable, value, eval(variable.names)) %>% 
   mutate(value = ifelse(!is.na(value), "|", "")) %>%
-  ggplot(aes(specification, variable, color = better.fit)) +
+  ggplot(aes(model_num, variable)) +
   geom_text(aes(label = value)) +
-  scale_color_manual(values = c("lightblue", "black", "red")) +
   labs(x = "\nspecification number", y = "variables\n") + 
   theme_minimal(base_size = 11) +
-  theme(legend.title = element_text(size = 10),
+  scale_x_continuous(breaks = seq(1, 10, by= 1)) +
+  theme(legend.title = element_text(size = 12),
         legend.text = element_text(size = 9),
         axis.text = element_text(color = "black"),
         axis.line = element_line(colour = "black"),
-        legend.position = "none",
         panel.grid.major = element_blank(),
         panel.grid.minor = element_blank(),
         panel.border = element_blank(),
-        panel.background = element_blank())
+        panel.background = element_blank()
+  )
+bottom
 
-# join panels
-cowplot::plot_grid(top, bottom, ncol = 1, align = "v", labels = c('A', 'B'))
 
-#full.model = lmer(score_z ~ personality + topic + liwc + value + task + audio + liwc:task + value:task + liwc:value + liwc:value:task + (1|task/model), data=test_df)
-#models.1 = MuMIn::dredge(full.model, rank = "AIC", extra = "BIC")
+cowplot::plot_grid(top, bottom, ncol = 1, align = "v", axis="l", labels = c('A', 'B'))
+
+
+#median bar plot
+medians <- aggregate(all_params[, 5], list(all_params$term), median)
+medians <- medians %>%
+  filter(Group.1 == "audio"|Group.1=="value"|Group.1=="personality"|Group.1=="topic"|Group.1=="linguistic"|Group.1=="liwc")
+
+x_names <- c("Audio", "Values", "Personality", "Topics", 
+                 "Linguistic", "LIWC")
+x_vars <- c("audio", "value", "personality", "topic", 
+             "linguistic", "liwc")
+vars <- as.data.frame(cbind(x_vars, x_names))
+names(vars) <- c("Group.1", "Names")
+
+medians <- left_join(medians, vars, by = "Group.1" )
+names(medians) <- c("Var_name", "x", "Group.1")
+
+median_plot <- medians %>% 
+  filter(Group.1 %in% c("Audio", "Values", "Personality", "Topics", "Linguistic", "LIWC")) %>%
+  arrange(x)
+median_plot$group_factor <- factor(median_plot$Group.1, ordered = TRUE)
+median_plot$group_factor <- factor(median_plot$group_factor, levels(median_plot$group_factor)[c(2,5,3,4,1)])
+bar1 <- ggplot(data = median_plot, aes(x = group_factor, y = x, fill = group_factor)) +
+  coord_flip() +
+  geom_bar(stat="identity") + 
+  scale_x_discrete(position = "top") +
+  labs(x = "Feature Set", y = "Median Parameter Estimate") +
+  theme(legend.title = element_text(size = 12),
+        legend.text = element_text(size = 9),
+        axis.text = element_text(color = "black"),
+        axis.line = element_line(colour = "black"),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        panel.border = element_blank(),
+        panel.background = element_blank()
+  )        
+bar1
+
+
+
 
