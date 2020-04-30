@@ -40,8 +40,7 @@ test_df <-
   group_by(task) %>%
   mutate(score_z = scale(score))
 
-
-
+### models from random effect reduction procedure:
 stan1 <- lmer(score_z ~ personality + topic + liwc + value + task + audio + liwc:task + 
                 (audio|task/model) + (linguistic+topic+liwc+audio|model), 
               REML=FALSE, data=test_df, control = lmerControl(optCtrl = list(maxfun = 100000, xtol_abs=1e-8, ftol_abs=1e-8)))
@@ -49,11 +48,35 @@ stan1.all <- allFit(stan1)
 stan1.nmkbw <- update(stan1, control=  lmerControl(optimizer="nmkbw"))
 #didn't converge
 
+#without interaction
+stan1.1 <- lmer(score_z ~ personality + topic + liwc + value + task + audio +
+                  (audio|task/model) + (linguistic+topic+liwc+audio|model), 
+                REML=FALSE, data=test_df, control = lmerControl(optCtrl = list(maxfun = 100000, xtol_abs=1e-8, ftol_abs=1e-8)))
+#fails
+
+#without interaction or task
+stan1.2 <- lmer(score_z ~ personality + topic + liwc + value + audio +
+                  (audio|task/model) + (linguistic+topic+liwc+audio|model), 
+                REML=FALSE, data=test_df, control = lmerControl(optCtrl = list(maxfun = 100000, xtol_abs=1e-8, ftol_abs=1e-8)))
+#runs
+
 stan2 <- lmer(score_z ~ personality + topic + liwc + value + task + audio + liwc:task + 
                 (audio|model:task) + (audio|task) + (topic+liwc+audio|model), 
               REML=FALSE, data=test_df, control = lmerControl(optCtrl = list(maxfun = 100000, xtol_abs=1e-8, ftol_abs=1e-8)))
 stan2.all <- allFit(stan2)
 #didn't converge
+
+#without interaction
+stan2.1 <- lmer(score_z ~ personality + topic + liwc + value + task + audio +  
+                  (audio|model:task) + (audio|task) + (topic+liwc+audio|model), 
+                REML=FALSE, data=test_df, control = lmerControl(optCtrl = list(maxfun = 100000, xtol_abs=1e-8, ftol_abs=1e-8)))
+#runs
+
+#without interaction or task
+stan2.2 <- lmer(score_z ~ personality + topic + liwc + value + audio +  
+                  (audio|model:task) + (audio|task) + (topic+liwc+audio|model), 
+                REML=FALSE, data=test_df, control = lmerControl(optCtrl = list(maxfun = 100000, xtol_abs=1e-8, ftol_abs=1e-8)))
+#runs
 
 stan3 <- lmer(score_z ~ personality + topic + liwc + value + task + audio + liwc:task + 
                 (audio|model:task) + (audio|task) + (linguistic+topic+liwc+audio|model),
@@ -63,6 +86,18 @@ stan3.nmkbw <- update(stan3, control=  lmerControl(optimizer="nmkbw"))
 stan3.nloptwrap <- update(stan3, control=  lmerControl(optimizer="nloptwrap"))
 #didn't converge
 
+#without interaction
+stan3.1 <- lmer(score_z ~ personality + topic + liwc + value + task + audio + 
+                  (audio|model:task) + (audio|task) + (linguistic+topic+liwc+audio|model),
+                REML=FALSE, data=test_df, control = lmerControl(optCtrl = list(maxfun = 100000, xtol_abs=1e-8, ftol_abs=1e-8)))
+#fails
+
+#without interaction or task
+stan3.2 <- lmer(score_z ~ personality + topic + liwc + value + audio + 
+                  (audio|model:task) + (audio|task) + (linguistic+topic+liwc+audio|model),
+                REML=FALSE, data=test_df, control = lmerControl(optCtrl = list(maxfun = 100000, xtol_abs=1e-8, ftol_abs=1e-8)))
+#runs
+
 stan4 <- lmer(score_z ~ personality + topic + liwc + value + task + audio + liwc:task + 
                 (liwc+audio|model:task) + (audio|task) + (linguistic+topic+liwc+audio|model),
               REML=FALSE, data=test_df, control = lmerControl(optCtrl = list(maxfun = 100000, xtol_abs=1e-8, ftol_abs=1e-8)))
@@ -71,61 +106,97 @@ stan4.NelderMead <- update(stan4, control = lmerControl(optimizer="Nelder_Mead")
 stan4.nloptwrap <- update(stan4, control=  lmerControl(optimizer="nloptwrap"))
 #didn't converge
 
+#without interaction
+stan4.1 <- lmer(score_z ~ personality + topic + liwc + value + task + audio +  
+                  (liwc+audio|model:task) + (audio|task) + (linguistic+topic+liwc+audio|model),
+                REML=FALSE, data=test_df, control = lmerControl(optCtrl = list(maxfun = 100000, xtol_abs=1e-8, ftol_abs=1e-8)))
+#fails
+
+#without interaction or task
+stan4.2 <- lmer(score_z ~ personality + topic + liwc + value + audio +  
+                  (liwc+audio|model:task) + (audio|task) + (linguistic+topic+liwc+audio|model),
+                REML=FALSE, data=test_df, control = lmerControl(optCtrl = list(maxfun = 100000, xtol_abs=1e-8, ftol_abs=1e-8)))
+#runs
+
 stan5 <- lmer(score_z ~ personality + topic + liwc + value + task + audio + liwc:task + 
                 (1|model:task) + (1|task) + (liwc+audio|model),
               REML=FALSE, data=test_df, control = lmerControl(optCtrl = list(maxfun = 100000, xtol_abs=1e-8, ftol_abs=1e-8)))
 #runs
+
+#without interaction
+stan5.1 <- lmer(score_z ~ personality + topic + liwc + value + task + audio + 
+                  (1|model:task) + (1|task) + (liwc+audio|model),
+                REML=FALSE, data=test_df, control = lmerControl(optCtrl = list(maxfun = 100000, xtol_abs=1e-8, ftol_abs=1e-8)))
+#runs
+#without interaction or task
+stan5.2 <- lmer(score_z ~ personality + topic + liwc + value + audio + 
+                  (1|model:task) + (1|task) + (liwc+audio|model),
+                REML=FALSE, data=test_df, control = lmerControl(optCtrl = list(maxfun = 100000, xtol_abs=1e-8, ftol_abs=1e-8)))
+#runs
+
 stan6 <- lmer(score_z ~ personality + topic + liwc + value + task + audio + liwc:task + 
                 (1|model:task) + (1|task) + (1|model), 
               REML=FALSE, data=test_df, control = lmerControl(optCtrl = list(maxfun = 100000, xtol_abs=1e-8, ftol_abs=1e-8)))
 #runs
-
-#stan 5 without interaction
-stan7 <- lmer(score_z ~ personality + topic + liwc + value + task + audio + 
-                (1|model:task) + (1|task) + (liwc+audio|model),
-              REML=FALSE, data=test_df, control = lmerControl(optCtrl = list(maxfun = 100000, xtol_abs=1e-8, ftol_abs=1e-8)))
+#without interaction
+stan6.1 <- lmer(score_z ~ personality + topic + liwc + value + task + audio + 
+                  (1|model:task) + (1|task) + (1|model), 
+                REML=FALSE, data=test_df, control = lmerControl(optCtrl = list(maxfun = 100000, xtol_abs=1e-8, ftol_abs=1e-8)))
+#runs
+#without task or interaction
+stan6.2 <- lmer(score_z ~ personality + topic + liwc + value + audio + 
+                  (1|model:task) + (1|task) + (1|model), 
+                REML=FALSE, data=test_df, control = lmerControl(optCtrl = list(maxfun = 100000, xtol_abs=1e-8, ftol_abs=1e-8)))
 #runs
 
-#stan 5 without task or interaction
-stan8 <- stan7 <- lmer(score_z ~ personality + topic + liwc + value + audio + 
-                         (1|model:task) + (1|task) + (liwc+audio|model),
-                       REML=FALSE, data=test_df, control = lmerControl(optCtrl = list(maxfun = 100000, xtol_abs=1e-8, ftol_abs=1e-8)))
-#runs
-
-#stan 6 without interaction
-stan9 <- lmer(score_z ~ personality + topic + liwc + value + task + audio +
-                (1|model:task) + (1|task) + (1|model), 
-              REML=FALSE, data=test_df, control = lmerControl(optCtrl = list(maxfun = 100000, xtol_abs=1e-8, ftol_abs=1e-8)))
-#runs
-
-#stan 6 without task or interaction
-stan10 <- lmer(score_z ~ personality + topic + liwc + value + audio +
-                 (1|model:task) + (1|task) + (1|model), 
-               REML=FALSE, data=test_df, control = lmerControl(optCtrl = list(maxfun = 100000, xtol_abs=1e-8, ftol_abs=1e-8)))
-#runs 
-
-#hypothesized model
-stan11 <- lmer(score_z ~ linguistic + topic + liwc + value + task + audio + 
-                 topic:liwc + topic:task + liwc:task + value:task + 
-                 (model|task/model), REML=FALSE, data=test_df, control = lmerControl(optCtrl = list(maxfun = 1000000,xtol_abs=1e-8, ftol_abs=1e-8)))
+#hypothesized model #1
+stan7 <- lmer(score_z ~ linguistic + topic + liwc + value + task + audio + 
+                topic:liwc + topic:task + liwc:task + value:task + 
+                (model|task/model), REML=FALSE, data=test_df, control = lmerControl(optCtrl = list(maxfun = 1000000,xtol_abs=1e-8, ftol_abs=1e-8)))
 #doesn't converge
-
+#with only two interactions
+stan7.1 <- lmer(score_z ~ linguistic + topic + liwc + value + task + audio + 
+                  liwc:task + value:task + 
+                  (model|task/model), REML=FALSE, data=test_df, control = lmerControl(optCtrl = list(maxfun = 1000000,xtol_abs=1e-8, ftol_abs=1e-8)))
+#fails
+#only fixed effect reduction interaction
+stan7.2 <- lmer(score_z ~ linguistic + topic + liwc + value + task + audio + 
+                  liwc:task + 
+                  (model|task/model), REML=FALSE, data=test_df, control = lmerControl(optCtrl = list(maxfun = 1000000,xtol_abs=1e-8, ftol_abs=1e-8)))
+#runs
 #without interactions
-stan12 <- lmer(score_z ~ linguistic + topic +liwc + value + task + audio +
-                 (model|task/model), REML=FALSE, data=test_df, control = lmerControl(optCtrl = list(maxfun = 1000000,xtol_abs=1e-8, ftol_abs=1e-8)))
+stan7.3 <- lmer(score_z ~ linguistic + topic +liwc + value + task + audio +
+                  (model|task/model), REML=FALSE, data=test_df, control = lmerControl(optCtrl = list(maxfun = 1000000,xtol_abs=1e-8, ftol_abs=1e-8)))
 #doesn't converge
 
+#without task or interactions
+stan7.4 <- lmer(score_z ~ linguistic + topic +liwc + value + audio +
+                  (model|task/model), REML=FALSE, data=test_df, control = lmerControl(optCtrl = list(maxfun = 1000000,xtol_abs=1e-8, ftol_abs=1e-8)))
+#fails
 #hypothesized model #2
-stan13 <- lmer(score_z ~ linguistic + topic + liwc + value + task + audio + 
-                 topic:liwc + topic:task + liwc:task + value:task + 
-                 (1|task/model), REML=FALSE, data=test_df, control = lmerControl(optCtrl = list(maxfun = 1000000,xtol_abs=1e-8, ftol_abs=1e-8)))
+stan8 <- lmer(score_z ~ linguistic + topic + liwc + value + task + audio + 
+                topic:liwc + topic:task + liwc:task + value:task + 
+                (1|task/model), REML=FALSE, data=test_df, control = lmerControl(optCtrl = list(maxfun = 1000000,xtol_abs=1e-8, ftol_abs=1e-8)))
+#runs
+#with only two interactions
+stan8.1 <- lmer(score_z ~ linguistic + topic + liwc + value + task + audio + 
+                  liwc:task + value:task + 
+                  (1|task/model), REML=FALSE, data=test_df, control = lmerControl(optCtrl = list(maxfun = 1000000,xtol_abs=1e-8, ftol_abs=1e-8)))
+#runs
+#with only one interaction
+stan8.2 <- lmer(score_z ~ linguistic + topic + liwc + value + task + audio + 
+                  liwc:task +
+                  (1|task/model), REML=FALSE, data=test_df, control = lmerControl(optCtrl = list(maxfun = 1000000,xtol_abs=1e-8, ftol_abs=1e-8)))
 #runs
 #without interactions
-stan14 <- lmer(score_z ~ linguistic + topic + liwc + value + task + audio + 
-                 (1|task/model), REML=FALSE, data=test_df, control = lmerControl(optCtrl = list(maxfun = 1000000,xtol_abs=1e-8, ftol_abs=1e-8)))
+stan8.3 <- lmer(score_z ~ linguistic + topic + liwc + value + task + audio + 
+                  (1|task/model), REML=FALSE, data=test_df, control = lmerControl(optCtrl = list(maxfun = 1000000,xtol_abs=1e-8, ftol_abs=1e-8)))
 #runs
-
-model_fits_stan =list(stan6, stan7, stan8, stan9, stan10, stan13, stan14)
+#without task or interactions
+stan8.4 <- lmer(score_z ~ linguistic + topic + liwc + value + audio + 
+                  (1|task/model), REML=FALSE, data=test_df, control = lmerControl(optCtrl = list(maxfun = 1000000,xtol_abs=1e-8, ftol_abs=1e-8)))
+#runs
+model_fits_stan =list(stan8.4, stan8.3, stan8.2, stan8.1, stan7.2, stan6.2, stan6.1, stan6, stan5.2, stan5.1, stan4.2, stan3.2, stan2.2, stan2.1, stan1.2)
 
 model_params_stan <- model_fits_stan %>%
   tibble() %>%
@@ -155,7 +226,7 @@ model_confints = map(model_fits_stan, ~confint.merMod(.x, level=.95, method="boo
          "upper" = "X97.5..")
 
 all_params <- left_join(all_params, model_confints)
-save(all_params, file = "all_params_raw.rda")
+save(all_params, file = "all_params_stan.rda")
 
 #plots
 top = all_params %>%

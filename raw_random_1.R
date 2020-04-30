@@ -354,3 +354,29 @@ r9.4 <- lmer(score ~ (personality+linguistic+topic+liwc+value+task)^6 + audio +
                (1|task) + 
                (1|model), REML=FALSE, data=test_df, control = lmerControl(optCtrl = list(maxfun = 100000)))
 save(r9.4, file = "r9.4.rda")
+
+
+###
+#best fits
+
+r9.4 <- lmer(score ~ (personality+linguistic+topic+liwc+value+task)^6 + audio +
+               (topic+liwc+audio|model:task) + 
+               (1|task) + 
+               (1|model), REML=FALSE, data=test_df, control = lmerControl(optCtrl = list(maxfun = 100000)))
+
+#14: task:audio ##parsimonious fit
+r14.3 <- lmer(score ~ (personality+linguistic+topic+liwc+value+task)^6 + audio +
+                (liwc+value+audio|model:task) + 
+                (1|task) + 
+                (liwc|model), REML=FALSE, data=test_df, control = lmerControl(optCtrl = list(maxfun = 100000)))
+
+r13.2 <- lme4::lmer(score ~ (personality+linguistic+topic+liwc+value+task)^6 + audio +
+                      (topic+liwc+value+audio|model:task) + 
+                      (1|task) + 
+                      (1|model), REML=FALSE, data=test_df, control = lmerControl(optCtrl = list(maxfun = 100000)))
+
+r10.1 <- lmer(score ~ (personality+linguistic+topic+liwc+value+task)^6 + audio +
+                (1|task:model) +   
+                (audio|task) + 
+                (liwc+audio|model), REML=FALSE, data=test_df, control = lmerControl(optCtrl = list(maxfun = 1000000)))
+save(r10.1, file = "r10.1.rda")
