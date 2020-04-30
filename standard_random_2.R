@@ -432,22 +432,22 @@ save(n12.4, file = "n12.4.rda")
 anova(n8.4, n8.3, n7.2, n8.1)
 
 
-m8.4 <- lmer(score_z ~ (personality+linguistic+topic+liwc+value+task)^6 + audio +
+n8.4 <- lmer(score_z ~ (personality+linguistic+topic+liwc+value+task)^6 + audio +
                (audio|model:task) + 
                (audio|task) + 
                (topic+liwc+audio|model), REML=FALSE, data=test_df, control = lmerControl(optCtrl = list(maxfun = 100000)))
 
-m8.3 <- lmer(score_z ~ (personality+linguistic+topic+liwc+value+task)^6 + audio +
+n8.3 <- lmer(score_z ~ (personality+linguistic+topic+liwc+value+task)^6 + audio +
                (audio|model:task) + 
                (audio|task) + 
                (linguistic+topic+liwc+audio|model), REML=FALSE, data=test_df, control = lmerControl(optCtrl = list(maxfun = 100000)))
 
-m7.2 <- lmer(score_z ~ (personality+linguistic+topic+liwc+value+task)^6 + audio +
+n7.2 <- lmer(score_z ~ (personality+linguistic+topic+liwc+value+task)^6 + audio +
                (liwc+audio|model:task) + 
                (audio|task) + 
                (linguistic+topic+liwc+audio|model), REML=FALSE, data=test_df, control = lmerControl(optCtrl = list(maxfun = 100000)))
 
-m8.1 <- lmer(score_z ~ (personality+linguistic+topic+liwc+value+task)^6 + audio +
+n8.1 <- lmer(score_z ~ (personality+linguistic+topic+liwc+value+task)^6 + audio +
                (1|model:task) + 
                (1|task) + 
                (liwc+audio|model), REML=FALSE, data=test_df, control = lmerControl(optCtrl = list(maxfun = 100000)))
