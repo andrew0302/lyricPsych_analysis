@@ -234,6 +234,7 @@ save(all_params, file = "all_params_stan.rda")
 #plots
 top = all_params %>%
   filter(term=="value"|term=="liwc"|term=="audio"|term=="personality"|term=="topic"|term=="linguistic") %>%
+  #filter(term=="value"|term=="liwc"|term=="audio"|term=="personality"|term=="topic"|term=="linguistic"|term=="taskgenre_clf"|term=="taskrec_item_cold") %>%
   #filter(term=="value"|term=="liwc"|term=="audio") %>%
   ggplot(aes(model_num, estimate, color = term)) +
   geom_errorbar(aes(ymin = lower, ymax = upper), position="dodge") +
@@ -269,15 +270,6 @@ model_fits_all = model_fits_stan %>%
     left_join(., model_fits_all) %>%
     arrange(AIC)%>%
     select(audio, liwc, linguistic, topic, value, personality, everything(), -AIC, -BIC, -contains("Residual"), -contains("_ sd__M"), -contains("cor")))
-
-models.sca <- models.sca %>%
-  rename(
-    fixed_audio=audio, fixed_liwc=liwc, fixed_value=value, 
-    fixed_personality=personality, fixed_linguistic=linguistic, 
-    fixed_topic=topic, `interaction_liwc:taskgenre_clf`=`liwc:taskgenre_clf`, 
-    `interaction_liwc:taskrec_item_cold`=`liwc:taskrec_item_cold`, 
-    `interaction_value:taskgenre_clf`=`value:taskgenre_clf`, 
-    `interaction_value:taskrec_item_cold`=`value:taskrec_item_cold`)
 
 bottom_plot <- models.sca %>%
   select(-taskrec_item_cold) %>%
@@ -365,62 +357,15 @@ cowplot::plot_grid(median_plot, top, bottom, ncol = 1, align = "v", axis="l", la
 
 ##interactions
 stan8.1_plot <- plot_model(stan8.1, ci.lvl=0.95)
+stan8.1_plot <- stan8.1_plot + theme(text=element_text(size=15)) +
+  ggtitle("") +
+  labs(y="Parameter Estimates")
 
-int_liwc_task <- plot_model(stan8.1, type="pred", terms=c("task", "liwc [0, 1]"))
-int_value_task <- plot_model(stan8.1, type="pred", terms=c("task", "value [0, 1]"))
-
-eff_liwc_task <- plot_model(stan8.1, type = "eff", terms = c("task", "liwc [0, 1]"), ci.lvl=.95)
-eff_liwc_task + theme_sjplot()
+eff_liwc_task <- plot_model(stan8.1, type = "eff", terms = c("task", "liwc [0, 1]"), ci.lvl=.95) 
 eff_value_task <- plot_model(stan8.1, type = "eff", terms = c("task", "value [0, 1]"), ci.lvl=.95)
-eff_value_task + theme_sjplot()
-plot_model(stan8.1, type = "re", terms = c("task", "model"))
 
 
-eff_liwc_task <- effect("liwc*task", stan8.1, KR=T)
-eff_liwc_task_plot <- as.data.frame((eff_liwc_task))
-eff_liwc_task_plot$task <- as.factor(eff_liwc_task_plot$task)
-eff_liwc_task_plot %>%
-  filter(liwc == 0.0|liwc == 1.0) %>%
-  ggplot(aes(liwc,fit, color=task), group=task) +
-  geom_errorbar(aes(ymin = lower, ymax = upper), position="dodge") +
-  geom_point(position=position_dodge(width=.9)) +
-  theme()
-
-
-eff_liwc_task_plot <- eff_liwc_task_plot %>%
-  filter(liwc == 0.0|liwc == 1.0)
-ggplot(data=eff_liwc_task_plot, aes(liwc, fit, color=task), group=task) +
-  geom_line()
-
-
-eff_value_task <- effect("value*task", stan8.1, KR=T)
-plot(eff_value_task, confint=list(col='red'))
-plot_model(stan8.1, type="int", terms=c(value, score_z))
-
-eff_value_task_plot <- as.data.frame((eff_value_task))
-eff_value_task_plot$task <- as.factor(eff_value_task_plot$task)
-
-eff_value_task_plot %>%
-  #  filter(value == 0.0|value == 1.0) %>%
-  ggplot(aes(value,fit, color=task), group=task) +
-  geom_errorbar(aes(ymin = lower, ymax = upper), position="dodge") +
-  geom_point(position=position_dodge(width=.9)) +
-  theme()
-
-eff_value_task_plot <- eff_value_task_plot %>%
-  filter(value == 0.0|value == 1.0)
-ggplot(data=eff_value_task_plot, aes(value, fit, color=task), group=task) +
-  geom_line() 
-
-
-
-#audio vs. text AIC plot
-stan_null1 <- lmer(score_z ~ audio +
-                     (model|task/model), REML=FALSE, data=test_df, control = lmerControl(optCtrl = list(maxfun = 1000000,xtol_abs=1e-8, ftol_abs=1e-8)))
-save(stan_null1, file = "stan_null1.rda")
-
-stan_null1 <- lmer(score_z ~ audio + 
-                     (1|task/model), REML=FALSE, data=test_df, control = lmerControl(optCtrl = list(maxfun = 1000000,xtol_abs=1e-8, ftol_abs=1e-8)))
-save(stan_null2, file = "stan_null1.rda")
-
-
+right_column_plot <- cowplot::plot_grid(eff_liwc_task, eff_value_task, ncol=1, align = "v", axis="l", labels = c('B', 'C'))
+plot2 <- cowplot::plot_grid(stan8.1_plot, right_column_plot, ncol=2, align="h", labels=c('A'))
+#int_liwc_task <- plot_model(stan8.1, type="pred", terms=c("task", "liwc [0, 1]"))
+#int_value_task <- plot_model(stan8.1, type="pred", terms=c("task", "value [0, 1]"))
