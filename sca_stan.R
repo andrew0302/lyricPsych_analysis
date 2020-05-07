@@ -150,53 +150,56 @@ stan6.2 <- lmer(score_z ~ personality + topic + liwc + value + audio +
 #runs
 
 #hypothesized model #1
-stan7 <- lmer(score_z ~ linguistic + topic + liwc + value + task + audio + 
+stan7 <- lmer(score_z ~ personality + linguistic + topic + liwc + value + task + audio + 
                 topic:liwc + topic:task + liwc:task + value:task + 
                 (model|task/model), REML=FALSE, data=test_df, control = lmerControl(optCtrl = list(maxfun = 1000000,xtol_abs=1e-8, ftol_abs=1e-8)))
 #doesn't converge
 #with only two interactions
-stan7.1 <- lmer(score_z ~ linguistic + topic + liwc + value + task + audio + 
+stan7.1 <- lmer(score_z ~ personality + linguistic + topic + liwc + value + task + audio + 
                   liwc:task + value:task + 
                   (model|task/model), REML=FALSE, data=test_df, control = lmerControl(optCtrl = list(maxfun = 1000000,xtol_abs=1e-8, ftol_abs=1e-8)))
 #fails
 #only fixed effect reduction interaction
-stan7.2 <- lmer(score_z ~ linguistic + topic + liwc + value + task + audio + 
+stan7.2 <- lmer(score_z ~ personality + linguistic + topic + liwc + value + task + audio + 
                   liwc:task + 
                   (model|task/model), REML=FALSE, data=test_df, control = lmerControl(optCtrl = list(maxfun = 1000000,xtol_abs=1e-8, ftol_abs=1e-8)))
-#runs
+save(stan7.2, file = "stan7.2.rda") #runs
 #without interactions
-stan7.3 <- lmer(score_z ~ linguistic + topic +liwc + value + task + audio +
+stan7.3 <- lmer(score_z ~ personality + linguistic + topic +liwc + value + task + audio +
                   (model|task/model), REML=FALSE, data=test_df, control = lmerControl(optCtrl = list(maxfun = 1000000,xtol_abs=1e-8, ftol_abs=1e-8)))
 #doesn't converge
 
 #without task or interactions
-stan7.4 <- lmer(score_z ~ linguistic + topic +liwc + value + audio +
+stan7.4 <- lmer(score_z ~ personality + linguistic + topic +liwc + value + audio +
                   (model|task/model), REML=FALSE, data=test_df, control = lmerControl(optCtrl = list(maxfun = 1000000,xtol_abs=1e-8, ftol_abs=1e-8)))
 #fails
 #hypothesized model #2
-stan8 <- lmer(score_z ~ linguistic + topic + liwc + value + task + audio + 
+stan8 <- lmer(score_z ~ personality + linguistic + topic + liwc + value + task + audio + 
                 topic:liwc + topic:task + liwc:task + value:task + 
                 (1|task/model), REML=FALSE, data=test_df, control = lmerControl(optCtrl = list(maxfun = 1000000,xtol_abs=1e-8, ftol_abs=1e-8)))
+save(stan8, file = "stan8.rda") #runs
 #runs
 #with only two interactions
-stan8.1 <- lmer(score_z ~ linguistic + topic + liwc + value + task + audio + 
+stan8.1 <- lmer(score_z ~ personality +linguistic + topic + liwc + value + task + audio + 
                   liwc:task + value:task + 
                   (1|task/model), REML=FALSE, data=test_df, control = lmerControl(optCtrl = list(maxfun = 1000000,xtol_abs=1e-8, ftol_abs=1e-8)))
-#runs
+save(stan8.1, file = "stan8.1.rda") #runs
 #with only one interaction
-stan8.2 <- lmer(score_z ~ linguistic + topic + liwc + value + task + audio + 
+stan8.2 <- lmer(score_z ~ personality +linguistic + topic + liwc + value + task + audio + 
                   liwc:task +
                   (1|task/model), REML=FALSE, data=test_df, control = lmerControl(optCtrl = list(maxfun = 1000000,xtol_abs=1e-8, ftol_abs=1e-8)))
-#runs
+save(stan8.2, file = "stan8.2.rda") #runs
 #without interactions
-stan8.3 <- lmer(score_z ~ linguistic + topic + liwc + value + task + audio + 
+stan8.3 <- lmer(score_z ~ personality +linguistic + topic + liwc + value + task + audio + 
                   (1|task/model), REML=FALSE, data=test_df, control = lmerControl(optCtrl = list(maxfun = 1000000,xtol_abs=1e-8, ftol_abs=1e-8)))
-#runs
+save(stan8.3, file = "stan8.3.rda") #runs
 #without task or interactions
-stan8.4 <- lmer(score_z ~ linguistic + topic + liwc + value + audio + 
+stan8.4 <- lmer(score_z ~ personality +linguistic + topic + liwc + value + audio + 
                   (1|task/model), REML=FALSE, data=test_df, control = lmerControl(optCtrl = list(maxfun = 1000000,xtol_abs=1e-8, ftol_abs=1e-8)))
-#runs
-model_fits_stan =list(stan8.4, stan8.3, stan8.2, stan8.1, stan7.2, stan6.2, stan6.1, stan6, stan5.2, stan5.1, stan4.2, stan3.2, stan2.2, stan2.1, stan1.2)
+save(stan8.4, file = "stan8.4.rda") #runs
+
+#model_fits_stan =list(stan8.4, stan8.3, stan8.2, stan8.1, stan7.2, stan6.2, stan6.1, stan6, stan5.2, stan5.1, stan4.2, stan3.2, stan2.2, stan2.1, stan1.2)
+model_fits_stan =list(stan8.4, stan8.3, stan8.2, stan8.1, stan7.2)
 
 model_params_stan <- model_fits_stan %>%
   tibble() %>%
@@ -235,16 +238,16 @@ top = all_params %>%
   ggplot(aes(model_num, estimate, color = term)) +
   geom_errorbar(aes(ymin = lower, ymax = upper), position="dodge") +
   geom_point(position=position_dodge(width=.9)) +
-  scale_colour_manual(values = inferno(6, alpha = 1, begin = .1, end = .9, direction = 1), guide = FALSE) +
+  scale_colour_manual(values = inferno(6, alpha = 1, begin = .1, end = .9, direction = 1), guide = "legend") +
   scale_fill_manual(values = inferno(6, alpha = 1, begin=.1, end=.9, direction=1), guide=FALSE) +
-  labs(x = "", y = "regression coefficient\n") + 
+  labs(x = "", y = "parameter estimate\n") + 
   theme_minimal(base_size = 11) +
-  scale_x_continuous(breaks = seq(1, 10, by= 1)) +
+  scale_x_continuous(breaks = seq(1, 8, by= 1)) +
   theme(legend.title = element_text(size = 10),
         legend.text = element_text(size = 9),
         axis.text = element_text(color = "black"),
         axis.line = element_line(colour = "black"),
-        #        legend.position = "none",
+        legend.position = "top",
         panel.grid.major = element_blank(),
         panel.grid.minor = element_blank(),
         panel.border = element_blank(),
@@ -265,20 +268,49 @@ model_fits_all = model_fits_stan %>%
     spread(term, estimate) %>%
     left_join(., model_fits_all) %>%
     arrange(AIC)%>%
-    select(AIC, BIC, everything()))
+    select(audio, liwc, linguistic, topic, value, personality, everything(), -AIC, -BIC, -contains("Residual"), -contains("_ sd__M"), -contains("cor")))
 
-variable.names = names(select(models.sca, -model_num, -AIC, -BIC))
+models.sca <- models.sca %>%
+  rename(
+    fixed_audio=audio, fixed_liwc=liwc, fixed_value=value, 
+    fixed_personality=personality, fixed_linguistic=linguistic, 
+    fixed_topic=topic, `interaction_liwc:taskgenre_clf`=`liwc:taskgenre_clf`, 
+    `interaction_liwc:taskrec_item_cold`=`liwc:taskrec_item_cold`, 
+    `interaction_value:taskgenre_clf`=`value:taskgenre_clf`, 
+    `interaction_value:taskrec_item_cold`=`value:taskrec_item_cold`)
 
-bottom = models.sca %>%
+bottom_plot <- models.sca %>%
+  select(-taskrec_item_cold) %>%
+  rename(
+    fixed_audio=audio, fixed_liwc=liwc, fixed_value=value, 
+    fixed_personality=personality, fixed_linguistic=linguistic, 
+    fixed_topic=topic, fixed_task=taskgenre_clf, 
+    `interaction_liwc:taskgenre_clf`=`liwc:taskgenre_clf`, 
+    `interaction_liwc:taskrec_item_cold`=`liwc:taskrec_item_cold`, 
+    `interaction_value:taskgenre_clf`=`value:taskgenre_clf`, 
+    `interaction_value:taskrec_item_cold`=`value:taskrec_item_cold`, 
+    `random_task_intercept` = `task _ sd__(Intercept)`, 
+    `random_model:task_intercept` = `model:task _ sd__(Intercept)`)
+
+#variable.names = names(select(models.sca, -model_num, -AIC, -BIC))
+#variable.names = colnames(select(models.sca, -model_num))
+variable.names = colnames(select(bottom_plot, -model_num))
+
+slope_line <- data.frame(5, "random_model:task_model_slope", "|")
+names(slope_line) <- c("model_num", "variable", "value")
+
+#bottom = models.sca %>%
+bottom = bottom_plot %>%
   gather(variable, value, eval(variable.names)) %>% 
   mutate(value = ifelse(!is.na(value), "|", "")) %>%
+  rbind(slope_line) %>%
   ggplot(aes(model_num, variable)) +
   geom_text(aes(label = value)) +
-  labs(x = "\nspecification number", y = "variables\n") + 
+  labs(x = "\nmodel number", y = "variables\n") + 
   theme_minimal(base_size = 11) +
-  scale_x_continuous(breaks = seq(1, 10, by= 1)) +
+  scale_x_continuous(breaks = seq(1, 15, by= 1)) +
   theme(legend.title = element_text(size = 12),
-        legend.text = element_text(size = 9),
+        legend.text = element_text(size = 20),
         axis.text = element_text(color = "black"),
         axis.line = element_line(colour = "black"),
         panel.grid.major = element_blank(),
@@ -289,6 +321,7 @@ bottom = models.sca %>%
 bottom
 
 cowplot::plot_grid(top, bottom, ncol = 1, align = "v", axis="l", labels = c('A', 'B'))
+
 
 #median plot
 medians <- aggregate(all_params[, 5], list(all_params$term), median)
@@ -327,17 +360,25 @@ median_plot <-ggplot(data=medians, aes(x = reorder(Features, x), y = x, fill = F
         panel.background = element_blank())
 median_plot
 
-cowplot::plot_grid(top, median_plot, ncol = 2, align = "h", axis="l", labels = c('A', 'B'))
+#cowplot::plot_grid(top, median_plot, ncol = 2, align = "h", axis="l", labels = c('A', 'B'))
+cowplot::plot_grid(median_plot, top, bottom, ncol = 1, align = "v", axis="l", labels = c('A', 'B', 'C'))
+
+##interactions
+stan8.1_plot <- plot_model(stan8.1, ci.lvl=0.95)
+
+int_liwc_task <- plot_model(stan8.1, type="pred", terms=c("task", "liwc [0, 1]"))
+int_value_task <- plot_model(stan8.1, type="pred", terms=c("task", "value [0, 1]"))
+
+eff_liwc_task <- plot_model(stan8.1, type = "eff", terms = c("task", "liwc [0, 1]"), ci.lvl=.95)
+eff_liwc_task + theme_sjplot()
+eff_value_task <- plot_model(stan8.1, type = "eff", terms = c("task", "value [0, 1]"), ci.lvl=.95)
+eff_value_task + theme_sjplot()
+plot_model(stan8.1, type = "re", terms = c("task", "model"))
 
 
-eff_liwc_task <- effect("liwc*task", stan13, KR=T)
-plot(eff_liwc_task, confint=list(col='red'))
-plot_model(stan13, type="int", terms=c(liwc, score_z), ci.lvl=0.95)
-
+eff_liwc_task <- effect("liwc*task", stan8.1, KR=T)
 eff_liwc_task_plot <- as.data.frame((eff_liwc_task))
 eff_liwc_task_plot$task <- as.factor(eff_liwc_task_plot$task)
-
-
 eff_liwc_task_plot %>%
   filter(liwc == 0.0|liwc == 1.0) %>%
   ggplot(aes(liwc,fit, color=task), group=task) +
@@ -345,7 +386,41 @@ eff_liwc_task_plot %>%
   geom_point(position=position_dodge(width=.9)) +
   theme()
 
+
 eff_liwc_task_plot <- eff_liwc_task_plot %>%
   filter(liwc == 0.0|liwc == 1.0)
 ggplot(data=eff_liwc_task_plot, aes(liwc, fit, color=task), group=task) +
+  geom_line()
+
+
+eff_value_task <- effect("value*task", stan8.1, KR=T)
+plot(eff_value_task, confint=list(col='red'))
+plot_model(stan8.1, type="int", terms=c(value, score_z))
+
+eff_value_task_plot <- as.data.frame((eff_value_task))
+eff_value_task_plot$task <- as.factor(eff_value_task_plot$task)
+
+eff_value_task_plot %>%
+  #  filter(value == 0.0|value == 1.0) %>%
+  ggplot(aes(value,fit, color=task), group=task) +
+  geom_errorbar(aes(ymin = lower, ymax = upper), position="dodge") +
+  geom_point(position=position_dodge(width=.9)) +
+  theme()
+
+eff_value_task_plot <- eff_value_task_plot %>%
+  filter(value == 0.0|value == 1.0)
+ggplot(data=eff_value_task_plot, aes(value, fit, color=task), group=task) +
   geom_line() 
+
+
+
+#audio vs. text AIC plot
+stan_null1 <- lmer(score_z ~ audio +
+                     (model|task/model), REML=FALSE, data=test_df, control = lmerControl(optCtrl = list(maxfun = 1000000,xtol_abs=1e-8, ftol_abs=1e-8)))
+save(stan_null1, file = "stan_null1.rda")
+
+stan_null1 <- lmer(score_z ~ audio + 
+                     (1|task/model), REML=FALSE, data=test_df, control = lmerControl(optCtrl = list(maxfun = 1000000,xtol_abs=1e-8, ftol_abs=1e-8)))
+save(stan_null2, file = "stan_null1.rda")
+
+
