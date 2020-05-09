@@ -31,7 +31,7 @@ test_df$linguistic <- TrueFalseToNumbers(test_df$linguistic)
 test_df$audio <- TrueFalseToNumbers(test_df$audio)
 
 test_df$feature_number <- (test_df$personality+test_df$topic+test_df$linguistic+test_df$liwc+test_df$value+test_df$audio)
-test_df$dimension_number <- (test_df$personality*5+test_df$topic*25+test_df$linguistic*9+test_df$liwc*72+test_df$value*49+test_df$audio*240)
+test_df$dimension_number <- (test_df$personality*10+test_df$topic*25+test_df$linguistic*9+test_df$liwc*72+test_df$value*49+test_df$audio*240)
 lapply(test_df[,c('personality', 'topic', 'value', 'audio', 'linguistic', 'liwc')], as.factor)
 
 ####
