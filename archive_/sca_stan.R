@@ -356,7 +356,7 @@ median_plot
 cowplot::plot_grid(median_plot, top, bottom, ncol = 1, align = "v", axis="l", labels = c('A', 'B', 'C'))
 
 ##interactions
-stan8.1_plot <- plot_model(stan8.1, ci.lvl=0.95)
+stan8.1_plot <- plot_model(stan8.3, ci.lvl=0.95)
 stan8.1_plot <- stan8.1_plot + theme(text=element_text(size=15)) +
   ggtitle("") +
   labs(y="Parameter Estimates")

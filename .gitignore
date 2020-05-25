@@ -5,13 +5,6 @@
 # Edit at https://www.gitignore.io/?templates=r
 
 ### R ###
-#own temp file
-main_4.3.R
-questions.nb.html
-questions.html
-
-#own temp directory
-/archive_/
 
 # History files
 .Rhistory
