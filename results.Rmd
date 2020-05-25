@@ -10,6 +10,7 @@ output:
 ```{r setup, results=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 
+library(renv)
 library(tidyverse)
 library(broom.mixed)
 library(purrr)
@@ -26,6 +27,12 @@ library(here)
 library(Hmisc)
 library(effects)
 library(viridis)
+library(parallel)
+
+numCores <- (detectCores()-1)
+renv::init()
+renv::snapshot()
+#renv::restore()
 ```
 
 ```{r dataset, results=FALSE}
@@ -220,7 +227,7 @@ ran_params <- model_params_stan %>%
 ran_params$term <- paste(ran_params$group, "_", ran_params$term)
 all_params <- rbind(ran_params, fixed_params)
 
-model_confints = map(model_fits_stan, ~confint.merMod(.x, level=.95, method="boot", nsim=500)) %>%
+model_confints = map(model_fits_stan, ~confint.merMod(.x, level=.95, method="boot", nsim=500, parallel="multicore", ncpus=numCores)) %>%
   tibble() %>%
   rename("model" = ".") %>%
   mutate(tidied = purrr::map(model, broom::tidy), 
@@ -396,7 +403,7 @@ ran_params <- model_params_alt %>%
 ran_params$term <- paste(ran_params$group, "_", ran_params$term)
 all_params_alt <- rbind(ran_params, fixed_params)
 
-model_confints = map(model_fits_alt, ~confint.merMod(.x, level=.95, method="boot", nsim=500)) %>%
+model_confints = map(model_fits_alt, ~confint.merMod(.x, level=.95, method="boot", nsim=500, parallel="multicore", ncpus=numCores)) %>%
   tibble() %>%
   rename("model" = ".") %>%
   mutate(tidied = purrr::map(model, broom::tidy), 
