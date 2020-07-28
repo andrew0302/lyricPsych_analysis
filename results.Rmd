@@ -1,16 +1,17 @@
 ---
-title: "Butter Lyrics Analysis"
-author: ""
-date: "3/5/2020"
+title: "Butter Lyrics Analysis_1.1"
+author: "Andrew Demetriou, Jaehun Kim"
+date: "28/7/2020"
 output:
   html_document:
     df_print: paged
 ---
 
+We use the renv() package to ensure reproducibility of the analyses and the plots. While this has certain benefits, the cost is the time it takes to install the environment, and disk space which we estimate at approximately 3gb at the the of this script version. 
+
 ```{r setup, results=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 
-library(renv)
 library(tidyverse)
 library(broom.mixed)
 library(purrr)
@@ -21,21 +22,21 @@ library(lme4)
 library(lmerTest)
 library(boot)
 library(gplots)
-library(performance)
 library(see)
 library(here)
 library(Hmisc)
 library(effects)
 library(viridis)
 library(parallel)
+library(ggpubr)
 
 numCores <- (detectCores()-1)
-renv::init()
-renv::snapshot()
-#renv::restore()
+#renv::init()
+#renv::snapshot()
+renv::restore()
 ```
 
-```{r dataset, results=FALSE}
+```{r dataset}
 df <- read.csv(here("data_", "lyrics_runs.csv"))
 test_df <- df %>% filter(personality=="True"|topic=="True"|linguistic=="True"|liwc=="True"|value=="True"|audio=="True")
 
@@ -205,10 +206,16 @@ stan8.4 <- lmer(score_z ~ personality +linguistic + topic + liwc + value + audio
 
 ```
 
-Here we list the models included in our analysis, compute confidence intervals of all the parameter estimates of all models, and coerce into a table for plotting. As it may take some time to compute the confidence intervals, we include the output file under the commented command: #load(here("all_params_stan.rda")) for convenience. 
+Here we list the models included in our analysis, compute confidence intervals of all the parameter estimates of all models, and coerce into a table for plotting. As it may take some time to compute the confidence intervals, we include this abbreviated cell with the commands necessary to proceed without re-running everything:
+
+```{r}
+base::load(here("all_params_stan.rda"))
+model_fits_stan =list(stan8.4, stan8.3, stan8.2, stan8.1, stan7.2)
+```
+
+If you use the abbreviated cell, skip the cell below. If you wish to re-run the proceedure, then click below. 
 
 ```{r, results=FALSE}
-#load(here("all_params_stan.rda"))
 model_fits_stan =list(stan8.4, stan8.3, stan8.2, stan8.1, stan7.2)
 
 model_params_stan <- model_fits_stan %>%
@@ -240,8 +247,11 @@ model_confints = map(model_fits_stan, ~confint.merMod(.x, level=.95, method="boo
 
 all_params <- left_join(all_params, model_confints)
 save(all_params, file = "all_params_stan.rda")
-load(here("all_params_stan.rda"))
+```
 
+Some tidying in order to plot the data:
+
+```{r}
 model_fits_all = model_fits_stan %>%
   tibble() %>%
   rename("model" = ".") %>%
@@ -259,6 +269,7 @@ model_fits_all = model_fits_stan %>%
 
 variable.names = names(select(models.sca, -model_num))
 ```
+
 
 Here we compose the first results plot in our paper. The top plot is a collection of the bootstrapped parameter estimates of each of the models. The bottom plot shows which parameters were estimated in each model. 
 
@@ -278,7 +289,7 @@ top = all_params %>%
         legend.text = element_text(size = 11),
         axis.text = element_text(color = "black"),
         axis.line = element_line(colour = "black"),
-        legend.position = "top",
+        legend.position = "right",
         panel.grid.major = element_blank(),
         panel.grid.minor = element_blank(),
         panel.border = element_blank(),
@@ -301,23 +312,35 @@ model_fits_all = model_fits_stan %>%
     arrange(AIC)%>%
     select(audio, liwc, linguistic, topic, value, personality, everything(), -AIC, -BIC, -contains("Residual"), -contains("_ sd__M"), -contains("cor")))
 
+
 bottom_plot <- models.sca %>%
   select(-taskrec_item_cold) %>%
   rename(
-    fixed_audio=audio, fixed_liwc=liwc, fixed_value=value, 
-    fixed_personality=personality, fixed_linguistic=linguistic, 
-    fixed_topic=topic, fixed_task=taskgenre_clf, 
-    `interaction_liwc:taskgenre_clf`=`liwc:taskgenre_clf`, 
-    `interaction_liwc:taskrec_item_cold`=`liwc:taskrec_item_cold`, 
-    `interaction_value:taskgenre_clf`=`value:taskgenre_clf`, 
-    `interaction_value:taskrec_item_cold`=`value:taskrec_item_cold`, 
-    `random_task_intercept` = `task _ sd__(Intercept)`, 
-    `random_model:task_intercept` = `model:task _ sd__(Intercept)`)
+    `task[MGC]`=taskgenre_clf,
+    `liwc*task[MGC]`=`liwc:taskgenre_clf`,
+    `liwc*task[MR]`=`liwc:taskrec_item_cold`,
+    `value*task[MGC]`=`value:taskgenre_clf`,
+    `value*task[MR]`=`value:taskrec_item_cold`,
+    `task (intercept*)` = `task _ sd__(Intercept)`,
+    `model*task (intercept*)` = `model:task _ sd__(Intercept)`)
 
 variable.names = colnames(select(bottom_plot, -model_num))
 
-slope_line <- data.frame(5, "random_model:task_model_slope", "|")
+slope_line <- data.frame(5, "model*task (model-slope*)", "|")
 names(slope_line) <- c("model_num", "variable", "value")
+
+var_names <- c(
+  'task (intercept*)', 'model*task (intercept*)', 'model*task (model-slope*)', 
+  'liwc*task[MGC]', 'liwc*task[MR]', 'value*task[MGC]', 'value*task[MR]', 
+  'task[MGC]', 'audio', 'liwc', 'value', 'personality', 'linguistic', 'topic',
+  '(Intercept)'
+)
+var_colors <- c(
+  'red', 'red', 'red',
+  'black', 'black', 'black', 'black',
+  'black', 'black', 'black', 'black', 'black', 'black', 'black',
+  'black'
+)
 
 bottom = bottom_plot %>%
   gather(variable, value, eval(variable.names)) %>% 
@@ -328,6 +351,7 @@ bottom = bottom_plot %>%
   labs(x = "\nmodel number", y = "variables\n") + 
   theme_minimal(base_size = 11) +
   scale_x_continuous(breaks = seq(1, 15, by= 1)) +
+  scale_y_discrete(limits=var_names, labels=var_names) +
   theme(text = element_text(size=17),
         legend.title = element_text(size = 12),
         legend.text = element_text(size = 20),
@@ -336,11 +360,15 @@ bottom = bottom_plot %>%
         panel.grid.major = element_blank(),
         panel.grid.minor = element_blank(),
         panel.border = element_blank(),
-        panel.background = element_blank()
+        panel.background = element_blank(),
+        axis.text.y = element_text(colour = var_colors, angle=0, hjust=1)
   )
+bottom
+  
+# cowplot::plot_grid(top, bottom, ncol = 1, align = "v", axis="l", labels = c('A', 'B'))
+(g <- ggarrange(top, bottom, nrow=2, labels=c('A', 'B')))
 
-cowplot::plot_grid(top, bottom, ncol = 1, align = "v", axis="l", labels = c('A', 'B'))
-
+ggsave('./figure2.pdf', plot=g, width=6.5, height=6.5)
 ```
 
 Here we include the code for our second results plot for the model that estimated two interaction terms between:
@@ -349,18 +377,54 @@ Here we include the code for our second results plot for the model that estimate
 2) values and task
 
 ```{r}
-stan8.1_plot <- plot_model(stan8.1, ci.lvl=0.95)
-stan8.1_plot <- stan8.1_plot + theme(text=element_text(size=16)) +
-  ggtitle("") +
-  labs(y="Parameter Estimates")
+term.order = c(
+  "personality", "linguistic", "topic", "liwc", "value",
+  "taskgenre_clf", "taskrec_item_cold", "audio",
+  "liwc:taskgenre_clf", "liwc:taskrec_item_cold",
+  "value:taskgenre_clf", "value:taskrec_item_cold"
+)
+term.label = c(
+  "personality", "linguistic", "topic", "liwc", "value",
+  "task[MGC]", "task[MR]", "audio",
+  "liwc*task[MGC]", "liwc*task[MR]",
+  "value*task[MGC]", "value*task[MR]"
+)
 
-eff_liwc_task <- plot_model(stan8.1, type = "eff", terms = c("task", "liwc [0, 1]"), ci.lvl=.95) 
-eff_value_task <- plot_model(stan8.1, type = "eff", terms = c("task", "value [0, 1]"), ci.lvl=.95)
+(plot.left <- get_model_data(stan8.1, type="est") %>%
+  ggplot(mapping=aes(x=term, y=estimate, color=group)) +
+  geom_pointrange(aes(ymin=conf.low, ymax=conf.high), size=.3) +
+  labs(y = "Parameter Estimates", x = "") +
+  scale_x_discrete(breaks=term.order, labels=term.label) +
+  theme_light() +
+  # theme(legend.position = "none") +
+  theme(axis.text.y = element_text(angle=0, hjust=1),
+        legend.position = "none") +
+  coord_flip())
 
+(plot.right.upper <- get_model_data(stan8.1, type="eff", terms = c("task", "liwc [0, 1]"), ci.lvl=.95) %>%
+  ggplot(mapping=aes(x=x, y=predicted, color=group)) +
+  geom_pointrange(aes(ymin=conf.low, ymax=conf.high), size=.3,
+                  position = position_dodge2(width=.4)) +
+  labs(y = "", x = "", color = "liwc") +
+  scale_x_discrete(limits=c(1, 2, 3), labels=c("MAT", "MGC", "MR")) +
+  theme_light() + coord_flip())
 
-right_column_plot <- cowplot::plot_grid(eff_liwc_task, eff_value_task, ncol=1, align = "v", axis="l", labels = c('B', 'C'))
-plot2 <- cowplot::plot_grid(stan8.1_plot, right_column_plot, ncol=2, align="h", labels=c('A'))
-plot2
+(plot.right.lower <- get_model_data(stan8.1, type="eff", terms = c("task", "value [0, 1]"), ci.lvl=.95) %>%
+  ggplot(mapping=aes(x=x, y=predicted, color=group)) +
+  geom_pointrange(aes(ymin=conf.low, ymax=conf.high), size=.3,
+                  position = position_dodge2(width=.4)) +
+  labs(y = "Marginal Prediction", x = "", color = "value") +
+  scale_x_discrete(limits=c(1, 2, 3), labels=c("MAT", "MGC", "MR")) +
+  theme_light() + coord_flip())
+
+(g <- ggarrange(
+  plot.left,
+  ggarrange(plot.right.upper, plot.right.lower, nrow=2, labels=c("B", "C")),
+  ncol=2, labels=c("A", "")
+))
+
+ggsave('./figure3.pdf', plot=g, width=6, height=3)
+
 ```
 
 It is worth noting that dropping random effects related to task, and only estimating those related to the system e.g. (1|model), removes the singularity warnings discussed above. Although we did not include these in the paper, we did run these models, and show our code, and results below. Note that these models run without singularity warnings. 
@@ -475,3 +539,5 @@ plot2
 ```
 
 However, we chose not to include or interpret these models for three reasons: Firstly, we had standardized score within task, secondly we were aware that task was a part of the structure of our dataset, and thirdly our main effects of interest were not affected by whether or not we adjusted the random effects specifications of our model. As such, we elected not to directly interpret the parameter estimate for task in these models. 
+
+

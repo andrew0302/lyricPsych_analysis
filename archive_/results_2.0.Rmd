@@ -1,0 +1,252 @@
+---
+title: "Butter Lyrics Analysis - 2"
+author: ""
+date: "3/5/2020"
+output:
+  html_document:
+    df_print: paged
+---
+
+```{r setup, results=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(renv)
+library(tidyverse)
+library(broom.mixed)
+library(purrr)
+library(ggplot2)
+library(sjPlot)
+library(cowplot)
+library(lme4)
+library(lmerTest)
+library(boot)
+library(gplots)
+library(performance)
+library(see)
+library(here)
+library(Hmisc)
+library(effects)
+library(viridis)
+library(parallel)
+library(glmnet)
+
+numCores <- (detectCores()-1)
+#renv::init()
+#renv::snapshot()
+#renv::restore()
+```
+
+```{r dataset, results=FALSE}
+df <- read.csv(here("data_", "lyrics_runs.csv"))
+test_df <- df %>% filter(personality=="True"|topic=="True"|linguistic=="True"|liwc=="True"|value=="True"|audio=="True")
+
+#convert "True" and "False" to 1 and 0 respectively, for analysis
+TrueFalseToNumbers <- function(x, print=TRUE){
+  x <- as.character(x)
+  x <- replace(x, x=="True", "1")
+  x <- replace(x, x=="False", "0")
+  x <- as.numeric(x)
+  return(x)
+}
+
+test_df$personality <- TrueFalseToNumbers(test_df$personality)
+test_df$liwc <- TrueFalseToNumbers(test_df$liwc)
+test_df$topic <- TrueFalseToNumbers(test_df$topic)
+test_df$value <- TrueFalseToNumbers(test_df$value)
+test_df$linguistic <- TrueFalseToNumbers(test_df$linguistic)
+test_df$audio <- TrueFalseToNumbers(test_df$audio)
+
+test_df$feature_number <- (test_df$personality+test_df$topic+test_df$linguistic+test_df$liwc+test_df$value+test_df$audio)
+
+test_df$dimension_number <- (test_df$personality*5+test_df$topic*25+test_df$linguistic*9+test_df$liwc*72+test_df$value*49+test_df$audio*240)
+
+lapply(test_df[,c('personality', 'topic', 'value', 'audio', 'linguistic', 'liwc')], as.factor)
+```
+
+This dataset is the result of a series of runs of various system setups on three MIR tasks. The response variable, "score", is the output of each run where a higher score was more successful. The "task" column is a nominal variable representing each of the three tasks: genre classification, autotagging, or recommender system. The "models" column as a nominal variable, representing the three systems that were used for each task. 
+
+The columns "personality", "liwc", "topic", "value", "linguistic" and "audio" represent the feature sets used in each of the trial runs. The values in these columns are either "True" or "False" depending on whether or not they were used in a given trial run. There were 5 trials run for each configuration, indicated in the trial column. 
+
+```{r head}
+head(df)
+```
+This diagram illustrates the setup. 
+
+![diagram of data structure](image.png)
+
+Because the 'score' dependent varies based on how it is computed for each task, we standardized the scores within each task. 
+
+```{r, results=FALSE}
+#standardize score within task
+test_df <- 
+  test_df %>%
+  group_by(task) %>%
+  mutate(score_z = scale(score))
+```
+
+Here we show histograms of the raw and standardized dependent variable within each system. Note that "model" below refers to the system used:
+
+```{r}
+ggplot(test_df, aes(x = score, color = model, fill=model)) +
+  geom_histogram(bins = 1000) +
+  facet_wrap(~model)
+
+ggplot(test_df, aes(x = score_z, color = model, fill=model)) +
+  geom_histogram(bins = 1000) +
+  facet_wrap(~model)
+```
+
+Histograms showing raw score, standardized score within each task:
+
+```{r, echo=FALSE}
+ggplot(test_df, aes(x = score, color = task, fill=task)) +
+  geom_histogram(bins = 50) +
+  facet_wrap(~task)
+
+ggplot(test_df, aes(x = score_z, color = task, fill=task)) +
+  geom_histogram(bins = 50) +
+  facet_wrap(~task)
+```
+
+Here's another illustration, using 95% confidence intervals for each model, within each task, for the raw and standardized scores. Again, note that "model" refers to the system used in each MIR task:
+
+```{r}
+alpha <- .05
+ci_score <- 
+  test_df %>% 
+  group_by(task, model) %>%
+  dplyr::summarize(mean = mean(score),
+                   uci_score = mean(score) - qt(1-alpha/2, (n()-1))*sd(score)/sqrt(n()),
+                   lci_score = mean(score) + qt(1-alpha/2, (n()-1))*sd(score)/sqrt(n()))
+
+ci_score %>%
+  ggplot(aes(x = task, y =mean, fill = model)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  geom_errorbar(aes(ymin = lci_score, ymax = uci_score), position = "dodge")
+
+alpha <- .05
+ci_score_z <- 
+  test_df %>% 
+  group_by(task, model) %>%
+  dplyr::summarize(mean = mean(score_z),
+                   uci_score_z = mean(score_z) - qt(1-alpha/2, (n()-1))*sd(score_z)/sqrt(n()),
+                   lci_score_z = mean(score_z) + qt(1-alpha/2, (n()-1))*sd(score_z)/sqrt(n()))
+
+ci_score_z %>%
+  ggplot(aes(x = task, y =mean, fill = model)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  geom_errorbar(aes(ymin = lci_score_z, ymax = uci_score_z), position = "dodge")
+
+```
+
+glmnet lasso procedure for feature selection:
+
+```{r}
+c <- glmnet(as.matrix(test_df[3:8]), as.matrix(test_df[10]),alpha=1)
+```
+Each curve corresponds to a variable. It shows the path of its coefficient against the ℓ1-norm of the whole coefficient vector at as λ varies. The axis above indicates the number of nonzero coefficients at the current λ, which is the effective degrees of freedom (df) for the lasso.
+```{r}
+plot(c, label=TRUE)
+```
+
+
+
+```{r, results=FALSE}
+x=as.matrix(test_df[3:8])
+y=as.matrix(test_df[10])
+cvfit = cv.glmnet(x,y)
+plot(cvfit)
+```
+
+```{r}
+cvfit$lambda.min
+coef(cvfit, s = "lambda.min")
+```
+
+Interaction terms
+
+```{r}
+x1 <- model.matrix(~(df$audio+df$liwc+df$value+df$personality+df$linguistic+df$topic+df$task)^7,df$score, data=df)
+x1 <- x1[,2:ncol(x1)]
+cvfit = cv.glmnet(x1,y)
+```
+
+```{r}
+cvfit$lambda.1se
+#cvfit$lambda.min
+```
+
+
+```{r}
+#cvfit$lambda.min
+results <- coef(cvfit, s = "lambda.min")
+results
+```
+
+
+
+```{r}
+install.packages('selectiveInference')
+library(selectiveInference)
+```
+
+```{r}
+fit <- fs(x1,y)
+
+#fit = cv.glmnet(x1, y)
+#beta = as.numeric(coef(fit, s = cv.glmnet(x1, y)$lambda.1se))
+#beta=coef(fit, s = cv.glmnet(x1, y)$lambda.1se)[-1]
+#lambda = cv.glmnet(x1, y)$lambda.1se
+```
+
+```{r}
+#beta = cvfit$glmnet.fit$beta[,cvfit$lambda==cvfit$lambda.1se]
+n=2835
+out = fixedLassoInf(x1, y, beta, lambda, sigma=100000)
+```
+
+
+```{r}
+library(glinternet)
+numLevels = c(2, 2, 2, 2, 2, 2)
+fit <- glinternet.cv(x, y, numLevels)
+```
+
+```{r}
+coef(fit, lambdaIndex = NULL)
+```
+
+
+```{r}
+plot(fit)
+```
+
+```{r}
+i_1Std <- which(fit$lambdaHat1Std == fit$lambda)
+coefs <- coef(fit$glinternetFit)[[i_1Std]]
+coefs$mainEffects
+```
+
+
+```{r}
+coef(fit, s = "lambda.min")
+```
+
+```{r}
+idx_num <- (1:length(i_num))[i_num]
+idx_cat <- (1:length(i_num))[!i_num]
+names(numLevels)[idx_cat[coefs$mainEffects$cat]]
+```
+
+```{r}
+library("glmmLasso")
+```
+
+```{r}
+m <- glmmLasso(score ~ (audio+liwc+personality+value+topic+linguistic+task)^7, rnd= list(task=~1, model=~1), lambda=10, data=df)
+```
+
+```{r}
+m
+```
+

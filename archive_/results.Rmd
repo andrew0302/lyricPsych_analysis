@@ -1,0 +1,493 @@
+---
+title: "Butter Lyrics Analysis"
+author: ""
+date: "3/5/2020"
+output:
+  html_document:
+    df_print: paged
+---
+
+```{r setup, results=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(renv)
+library(tidyverse)
+library(broom.mixed)
+library(purrr)
+library(ggplot2)
+library(sjPlot)
+library(cowplot)
+library(lme4)
+library(lmerTest)
+library(boot)
+library(gplots)
+library(performance)
+library(see)
+library(here)
+library(Hmisc)
+library(effects)
+library(viridis)
+library(parallel)
+
+numCores <- (detectCores()-1)
+#renv::init()
+#renv::snapshot()
+renv::restore()
+```
+
+```{r dataset, results=FALSE}
+df <- read.csv(here("data_", "lyrics_runs.csv"))
+test_df <- df %>% filter(personality=="True"|topic=="True"|linguistic=="True"|liwc=="True"|value=="True"|audio=="True")
+
+#convert "True" and "False" to 1 and 0 respectively, for analysis
+TrueFalseToNumbers <- function(x, print=TRUE){
+  x <- as.character(x)
+  x <- replace(x, x=="True", "1")
+  x <- replace(x, x=="False", "0")
+  x <- as.numeric(x)
+  return(x)
+}
+
+test_df$personality <- TrueFalseToNumbers(test_df$personality)
+test_df$liwc <- TrueFalseToNumbers(test_df$liwc)
+test_df$topic <- TrueFalseToNumbers(test_df$topic)
+test_df$value <- TrueFalseToNumbers(test_df$value)
+test_df$linguistic <- TrueFalseToNumbers(test_df$linguistic)
+test_df$audio <- TrueFalseToNumbers(test_df$audio)
+
+test_df$feature_number <- (test_df$personality+test_df$topic+test_df$linguistic+test_df$liwc+test_df$value+test_df$audio)
+
+test_df$dimension_number <- (test_df$personality*5+test_df$topic*25+test_df$linguistic*9+test_df$liwc*72+test_df$value*49+test_df$audio*240)
+
+lapply(test_df[,c('personality', 'topic', 'value', 'audio', 'linguistic', 'liwc')], as.factor)
+```
+
+This dataset is the result of a series of runs of various system setups on three MIR tasks. The response variable, "score", is the output of each run where a higher score was more successful. The "task" column is a nominal variable representing each of the three tasks: genre classification, autotagging, or recommender system. The "models" column as a nominal variable, representing the three systems that were used for each task. 
+
+The columns "personality", "liwc", "topic", "value", "linguistic" and "audio" represent the feature sets used in each of the trial runs. The values in these columns are either "True" or "False" depending on whether or not they were used in a given trial run. There were 5 trials run for each configuration, indicated in the trial column. 
+
+```{r head}
+head(df)
+```
+This diagram illustrates the setup. 
+
+![diagram of data structure](image.png)
+
+Because the 'score' dependent varies based on how it is computed for each task, we standardized the scores within each task. 
+
+```{r, results=FALSE}
+#standardize score within task
+test_df <- 
+  test_df %>%
+  group_by(task) %>%
+  mutate(score_z = scale(score))
+```
+
+Here we show histograms of the raw and standardized dependent variable within each system. Note that "model" below refers to the system used:
+
+```{r}
+ggplot(test_df, aes(x = score, color = model, fill=model)) +
+  geom_histogram(bins = 1000) +
+  facet_wrap(~model)
+
+ggplot(test_df, aes(x = score_z, color = model, fill=model)) +
+  geom_histogram(bins = 1000) +
+  facet_wrap(~model)
+```
+
+Histograms showing raw score, standardized score within each task:
+
+```{r, echo=FALSE}
+ggplot(test_df, aes(x = score, color = task, fill=task)) +
+  geom_histogram(bins = 50) +
+  facet_wrap(~task)
+
+ggplot(test_df, aes(x = score_z, color = task, fill=task)) +
+  geom_histogram(bins = 50) +
+  facet_wrap(~task)
+```
+
+Here's another illustration, using 95% confidence intervals for each model, within each task, for the raw and standardized scores. Again, note that "model" refers to the system used in each MIR task:
+
+```{r}
+alpha <- .05
+ci_score <- 
+  test_df %>% 
+  group_by(task, model) %>%
+  dplyr::summarize(mean = mean(score),
+                   uci_score = mean(score) - qt(1-alpha/2, (n()-1))*sd(score)/sqrt(n()),
+                   lci_score = mean(score) + qt(1-alpha/2, (n()-1))*sd(score)/sqrt(n()))
+
+ci_score %>%
+  ggplot(aes(x = task, y =mean, fill = model)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  geom_errorbar(aes(ymin = lci_score, ymax = uci_score), position = "dodge")
+
+alpha <- .05
+ci_score_z <- 
+  test_df %>% 
+  group_by(task, model) %>%
+  dplyr::summarize(mean = mean(score_z),
+                   uci_score_z = mean(score_z) - qt(1-alpha/2, (n()-1))*sd(score_z)/sqrt(n()),
+                   lci_score_z = mean(score_z) + qt(1-alpha/2, (n()-1))*sd(score_z)/sqrt(n()))
+
+ci_score_z %>%
+  ggplot(aes(x = task, y =mean, fill = model)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  geom_errorbar(aes(ymin = lci_score_z, ymax = uci_score_z), position = "dodge")
+
+```
+
+Given the structure of the data, we evaluated the following models. We know that there is a 'structure' to our data that makes our observations non-independent: most obviously, is that certain models are used within certain tasks. The score will also vary by task, even though we standardized the score within task. So we chose to estimate two sets of 'random effects strutures' denoted by the following syntax, where "model" refers to the system used for each MIR task:
+
+1) (model|task/model)
+2) (1|task/model)
+
+see https://cran.r-project.org/web/packages/lme4/lme4.pdf for details. 
+
+A number of models resulted in errors related to negative eigenvalues, which make interpretation of those model questionable. These models were not interpreted any further. 
+
+Five converged with singularity warnings. This occurs when variance components - our 'random effects' - are estimated as being 0, or very close to 0. However, since we do not interpret the random effects, we proceeded with including the models with these warnings in our analysis. 
+
+It is worth noting that experts do not agree on how to treat singularity warnings. There are a number of proposed solutions described in various papers, that are conveniently at this link, under the heading "Singular models: random effect variances estimated as zero, or correlations estimated as +/- 1": https://bbolker.github.io/mixedmodels-misc/glmmFAQ.html#singular-models-random-effect-variances-estimated-as-zero-or-correlations-estimated-as---1
+
+It is likely that the warnings occur because of the first reason cited: "small numbers of random-effect levels", given our 3 tasks, and 6 models. However, as it does not affect how the parameter estimates of 'fixed effects' we proceed:
+
+
+```{r}
+#hypothesized model #1
+stan7 <- lmer(score_z ~ personality + linguistic + topic + liwc + value + task + audio + 
+                topic:liwc + topic:task + liwc:task + value:task + 
+                (model|task/model), REML=FALSE, data=test_df, control = lmerControl(optCtrl = list(maxfun = 1000000,xtol_abs=1e-8, ftol_abs=1e-8)))
+
+#with only two interactions
+stan7.1 <- lmer(score_z ~ personality + linguistic + topic + liwc + value + task + audio + 
+                  liwc:task + value:task + 
+                  (model|task/model), REML=FALSE, data=test_df, control = lmerControl(optCtrl = list(maxfun = 1000000,xtol_abs=1e-8, ftol_abs=1e-8)))
+
+#only fixed effect reduction interaction
+stan7.2 <- lmer(score_z ~ personality + linguistic + topic + liwc + value + task + audio + 
+                  liwc:task + 
+                  (model|task/model), REML=FALSE, data=test_df, control = lmerControl(optCtrl = list(maxfun = 1000000,xtol_abs=1e-8, ftol_abs=1e-8)))
+
+#without interactions
+stan7.3 <- lmer(score_z ~ personality + linguistic + topic +liwc + value + task + audio +
+                  (model|task/model), REML=FALSE, data=test_df, control = lmerControl(optCtrl = list(maxfun = 1000000,xtol_abs=1e-8, ftol_abs=1e-8)))
+#doesn't converge
+
+#without task or interactions
+stan7.4 <- lmer(score_z ~ personality + linguistic + topic +liwc + value + audio +
+                  (model|task/model), REML=FALSE, data=test_df, control = lmerControl(optCtrl = list(maxfun = 1000000,xtol_abs=1e-8, ftol_abs=1e-8)))
+#fails
+
+#hypothesized model #2
+stan8 <- lmer(score_z ~ personality + linguistic + topic + liwc + value + task + audio + 
+                topic:liwc + topic:task + liwc:task + value:task + 
+                (1|task/model), REML=FALSE, data=test_df, control = lmerControl(optCtrl = list(maxfun = 1000000,xtol_abs=1e-8, ftol_abs=1e-8)))
+
+#with only two interactions
+stan8.1 <- lmer(score_z ~ personality +linguistic + topic + liwc + value + task + audio + 
+                  liwc:task + value:task + 
+                  (1|task/model), REML=FALSE, data=test_df, control = lmerControl(optCtrl = list(maxfun = 1000000,xtol_abs=1e-8, ftol_abs=1e-8)))
+
+#with only one interaction
+stan8.2 <- lmer(score_z ~ personality +linguistic + topic + liwc + value + task + audio + 
+                  liwc:task +
+                  (1|task/model), REML=FALSE, data=test_df, control = lmerControl(optCtrl = list(maxfun = 1000000,xtol_abs=1e-8, ftol_abs=1e-8)))
+
+#without interactions
+stan8.3 <- lmer(score_z ~ personality +linguistic + topic + liwc + value + task + audio + 
+                  (1|task/model), REML=FALSE, data=test_df, control = lmerControl(optCtrl = list(maxfun = 1000000,xtol_abs=1e-8, ftol_abs=1e-8)))
+
+#without task or interactions
+stan8.4 <- lmer(score_z ~ personality +linguistic + topic + liwc + value + audio + 
+                  (1|task/model), REML=FALSE, data=test_df, control = lmerControl(optCtrl = list(maxfun = 1000000,xtol_abs=1e-8, ftol_abs=1e-8)))
+
+```
+
+```{r}
+check_model(stan7)
+```
+
+Here we list the models included in our analysis, compute confidence intervals of all the parameter estimates of all models, and coerce into a table for plotting. As it may take some time to compute the confidence intervals, we include this abbreviated cell with the commands necessary to proceed without re-running everything:
+
+```{r}
+base::load(here("all_params_stan.rda"))
+model_fits_stan =list(stan8.4, stan8.3, stan8.2, stan8.1, stan7.2)
+```
+
+If you use the abbreviated cell, skip the cell below. If you wish to re-run the proceedure, then click below. 
+
+```{r, results=FALSE}
+model_fits_stan =list(stan8.4, stan8.3, stan8.2, stan8.1, stan7.2)
+
+model_params_stan <- model_fits_stan %>%
+  tibble() %>%
+  rename("model" = ".") %>%
+  mutate(tidied = purrr::map(model, broom::tidy),
+         model_num = row_number()) %>%
+  select(model_num, tidied) %>%
+  unnest()
+model_params_stan$dv = "standardized"
+
+fixed_params <- model_params_stan %>% 
+  filter(effect=="fixed")
+ran_params <- model_params_stan %>% 
+  filter(effect=="ran_pars")
+ran_params$term <- paste(ran_params$group, "_", ran_params$term)
+all_params <- rbind(ran_params, fixed_params)
+
+model_confints = map(model_fits_stan, ~confint.merMod(.x, level=.95, method="boot", nsim=500, parallel="multicore", ncpus=numCores)) %>%
+  tibble() %>%
+  rename("model" = ".") %>%
+  mutate(tidied = purrr::map(model, broom::tidy), 
+         model_num = row_number()) %>%
+  select(model_num, tidied) %>%
+  unnest() %>%
+  rename("term" = ".rownames", 
+         "lower" = "X2.5..", 
+         "upper" = "X97.5..")
+
+all_params <- left_join(all_params, model_confints)
+save(all_params, file = "all_params_stan.rda")
+```
+
+Some tidying in order to plot the data:
+
+```{r}
+model_fits_all = model_fits_stan %>%
+  tibble() %>%
+  rename("model" = ".") %>%
+  mutate(model_num = row_number(),
+         AIC = map_dbl(model, AIC),
+         BIC = map_dbl(model, BIC)) %>%
+  select(-model)
+
+(models.sca = all_params %>%
+    select(model_num, term, estimate) %>%
+    spread(term, estimate) %>%
+    left_join(., model_fits_all) %>%
+    arrange(AIC)%>%
+    select(audio, liwc, linguistic, topic, value, personality, everything(), -AIC, -BIC, -contains("Intercept"), -contains("Residual"), -contains("cor")))
+
+variable.names = names(select(models.sca, -model_num))
+```
+
+
+Here we compose the first results plot in our paper. The top plot is a collection of the bootstrapped parameter estimates of each of the models. The bottom plot shows which parameters were estimated in each model. 
+
+```{r, results=FALSE}
+top = all_params %>%
+  filter(term=="value"|term=="liwc"|term=="audio"|term=="personality"|term=="topic"|term=="linguistic") %>%
+  ggplot(aes(model_num, estimate, color = term)) +
+  geom_errorbar(aes(ymin = lower, ymax = upper), position="dodge") +
+  geom_point(position=position_dodge(width=.9)) +
+  scale_colour_manual(values = inferno(6, alpha = 1, begin = .1, end = .9, direction = 1), guide = "legend") +
+  scale_fill_manual(values = inferno(6, alpha = 1, begin=.1, end=.9, direction=1), guide=FALSE) +
+  labs(x = "", y = "parameter estimate\n") + 
+  theme_minimal(base_size = 11) +
+  scale_x_continuous(breaks = seq(1, 8, by= 1)) +
+  theme(text = element_text(size=17), 
+        legend.title = element_text(size = 13),
+        legend.text = element_text(size = 11),
+        axis.text = element_text(color = "black"),
+        axis.line = element_line(colour = "black"),
+        legend.position = "top",
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        panel.border = element_blank(),
+        panel.background = element_blank())
+top
+
+
+model_fits_all = model_fits_stan %>%
+  tibble() %>%
+  rename("model" = ".") %>%
+  mutate(model_num = row_number(),
+         AIC = map_dbl(model, AIC),
+         BIC = map_dbl(model, BIC)) %>%
+  select(-model)
+
+(models.sca = all_params %>%
+    select(model_num, term, estimate) %>%
+    spread(term, estimate) %>%
+    left_join(., model_fits_all) %>%
+    arrange(AIC)%>%
+    select(audio, liwc, linguistic, topic, value, personality, everything(), -AIC, -BIC, -contains("Residual"), -contains("_ sd__M"), -contains("cor")))
+
+bottom_plot <- models.sca %>%
+  select(-taskrec_item_cold) %>%
+  rename(
+    fixed_audio=audio, fixed_liwc=liwc, fixed_value=value, 
+    fixed_personality=personality, fixed_linguistic=linguistic, 
+    fixed_topic=topic, fixed_task=taskgenre_clf, 
+    `interaction_liwc:taskgenre_clf`=`liwc:taskgenre_clf`, 
+    `interaction_liwc:taskrec_item_cold`=`liwc:taskrec_item_cold`, 
+    `interaction_value:taskgenre_clf`=`value:taskgenre_clf`, 
+    `interaction_value:taskrec_item_cold`=`value:taskrec_item_cold`, 
+    `random_task_intercept` = `task _ sd__(Intercept)`, 
+    `random_model:task_intercept` = `model:task _ sd__(Intercept)`)
+
+variable.names = colnames(select(bottom_plot, -model_num))
+
+slope_line <- data.frame(5, "random_model:task_model_slope", "|")
+names(slope_line) <- c("model_num", "variable", "value")
+
+bottom = bottom_plot %>%
+  gather(variable, value, eval(variable.names)) %>% 
+  mutate(value = ifelse(!is.na(value), "|", "")) %>%
+  rbind(slope_line) %>%
+  ggplot(aes(model_num, variable)) +
+  geom_text(aes(label = value)) +
+  labs(x = "\nmodel number", y = "variables\n") + 
+  theme_minimal(base_size = 11) +
+  scale_x_continuous(breaks = seq(1, 15, by= 1)) +
+  theme(text = element_text(size=17),
+        legend.title = element_text(size = 12),
+        legend.text = element_text(size = 20),
+        axis.text = element_text(color = "black"),
+        axis.line = element_line(colour = "black"),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        panel.border = element_blank(),
+        panel.background = element_blank()
+  )
+
+cowplot::plot_grid(top, bottom, ncol = 1, align = "v", axis="l", labels = c('A', 'B'))
+
+```
+
+Here we include the code for our second results plot for the model that estimated two interaction terms between:
+
+1) LIWC and task
+2) values and task
+
+```{r}
+stan8.1_plot <- plot_model(stan8.1, ci.lvl=0.95)
+stan8.1_plot <- stan8.1_plot + theme(text=element_text(size=16)) +
+  ggtitle("") +
+  labs(y="Parameter Estimates")
+
+eff_liwc_task <- plot_model(stan8.1, type = "eff", terms = c("task", "liwc [0, 1]"), ci.lvl=.95) 
+eff_value_task <- plot_model(stan8.1, type = "eff", terms = c("task", "value [0, 1]"), ci.lvl=.95)
+
+
+right_column_plot <- cowplot::plot_grid(eff_liwc_task, eff_value_task, ncol=1, align = "v", axis="l", labels = c('B', 'C'))
+plot2 <- cowplot::plot_grid(stan8.1_plot, right_column_plot, ncol=2, align="h", labels=c('A'))
+plot2
+```
+
+It is worth noting that dropping random effects related to task, and only estimating those related to the system e.g. (1|model), removes the singularity warnings discussed above. Although we did not include these in the paper, we did run these models, and show our code, and results below. Note that these models run without singularity warnings. 
+
+Estimating models:
+```{r}
+#with only two interactions
+stan9.1 <- lmer(score_z ~ personality +linguistic + topic + liwc + value + task + audio + 
+                liwc:task + value:task + 
+                (1|model), REML=FALSE, data=test_df, control = lmerControl(optCtrl = list(maxfun = 1000000,xtol_abs=1e-8, ftol_abs=1e-8)))
+#with only one interaction
+stan9.2 <- lmer(score_z ~ personality +linguistic + topic + liwc + value + task + audio + 
+                  liwc:task +
+                  (1|model), REML=FALSE, data=test_df, control = lmerControl(optCtrl = list(maxfun = 1000000,xtol_abs=1e-8, ftol_abs=1e-8)))
+#without interactions
+stan9.3 <- lmer(score_z ~ personality +linguistic + topic + liwc + value + task + audio + 
+                 (1|model), REML=FALSE, data=test_df, control = lmerControl(optCtrl = list(maxfun = 1000000,xtol_abs=1e-8, ftol_abs=1e-8)))
+#without task or interactions
+stan9.4 <- lmer(score_z ~ personality +linguistic + topic + liwc + value + audio + 
+                  (1|model), REML=FALSE, data=test_df, control = lmerControl(optCtrl = list(maxfun = 1000000,xtol_abs=1e-8, ftol_abs=1e-8)))
+
+model_fits_alt =list(stan9.4, stan9.3, stan9.2, stan9.1)
+```
+
+Extracting parameters, computing confidence intervals, coercing to table:
+
+```{r}
+model_params_alt <- model_fits_alt %>%
+  tibble() %>%
+  rename("model" = ".") %>%
+  mutate(tidied = purrr::map(model, broom::tidy),
+         model_num = row_number()) %>%
+  select(model_num, tidied) %>%
+  unnest()
+
+fixed_params <- model_params_alt %>% 
+  filter(effect=="fixed")
+ran_params <- model_params_alt %>% 
+  filter(effect=="ran_pars")
+ran_params$term <- paste(ran_params$group, "_", ran_params$term)
+all_params_alt <- rbind(ran_params, fixed_params)
+
+model_confints = map(model_fits_alt, ~confint.merMod(.x, level=.95, method="boot", nsim=500, parallel="multicore", ncpus=numCores)) %>%
+  tibble() %>%
+  rename("model" = ".") %>%
+  mutate(tidied = purrr::map(model, broom::tidy), 
+         model_num = row_number()) %>%
+  select(model_num, tidied) %>%
+  unnest() %>%
+  rename("term" = ".rownames", 
+         "lower" = "X2.5..", 
+         "upper" = "X97.5..")
+  
+all_params_alt <- left_join(all_params_alt, model_confints)
+save(all_params, file = "all_params_alt.rda")
+
+```
+
+In the first plots, we see that our parameter estimates and therefore our conclusions, are unchanged - although, we do not interpret the specific point estimates of each model. 
+
+Plots:
+```{r}
+top = all_params_alt %>%
+  filter(term=="value"|term=="liwc"|term=="audio"|term=="personality"|term=="topic"|term=="linguistic") %>%
+  ggplot(aes(model_num, estimate, color = term)) +
+  geom_errorbar(aes(ymin = lower, ymax = upper), position="dodge") +
+  geom_point(position=position_dodge(width=.9)) +
+  scale_colour_manual(values = inferno(6, alpha = 1, begin = .1, end = .9, direction = 1), guide = "legend") +
+  scale_fill_manual(values = inferno(6, alpha = 1, begin=.1, end=.9, direction=1), guide=FALSE) +
+  labs(x = "", y = "parameter estimate\n") + 
+  theme_minimal(base_size = 11) +
+  scale_x_continuous(breaks = seq(1, 8, by= 1)) +
+  theme(text = element_text(size=17), 
+        legend.title = element_text(size = 13),
+        legend.text = element_text(size = 11),
+        axis.text = element_text(color = "black"),
+        axis.line = element_line(colour = "black"),
+        legend.position = "top",
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        panel.border = element_blank(),
+        panel.background = element_blank())
+top
+```
+
+A difference may be noted in the second set of plots. As we are not accounting for the variance related to the task as a random effect, we see a difference when it is estimated as a fixed effect in the model below. 
+
+This can more clearly be observed if the order of the factor levels relating to task are changed: because one level of a factor is used as a reference group against which to compare other factors, changing the reference group allows for different levels of the factor to be estimated. 
+
+Order can be adjusted with the following commented commands:
+#levels(test_df$task) <- c("rec_item_cold", "genre_clf", "auto_tag")
+
+What we observe is what appears to be a more accurate estimate for the genre classification task, and that it appears to have a small, positive effect. The other two tasks appear to be poorly estimated, given the wide confidence intervals. 
+
+
+```{r}
+stan9.plot <- plot_model(stan9.1, ci.lvl=0.95)
+stan9.plot <- stan9.plot + theme(text=element_text(size=16)) +
+  ggtitle("") +
+  labs(y="Parameter Estimates")
+
+#levels(test_df$task) <- c("rec_item_cold", "genre_clf", "auto_tag")
+#levels(test_df$task) <- c("auto_tag", "genre_clf", "rec_item_cold")
+
+eff_liwc_task <- plot_model(stan9.1, type = "eff", terms = c("task", "liwc [0, 1]"), ci.lvl=.95) 
+eff_value_task <- plot_model(stan9.1, type = "eff", terms = c("task", "value [0, 1]"), ci.lvl=.95)
+
+
+right_column_plot <- cowplot::plot_grid(eff_liwc_task, eff_value_task, ncol=1, align = "v", axis="l", labels = c('B', 'C'))
+plot2 <- cowplot::plot_grid(stan9.plot, right_column_plot, ncol=2, align="h", labels=c('A'))
+plot2
+```
+
+However, we chose not to include or interpret these models for three reasons: Firstly, we had standardized score within task, secondly we were aware that task was a part of the structure of our dataset, and thirdly our main effects of interest were not affected by whether or not we adjusted the random effects specifications of our model. As such, we elected not to directly interpret the parameter estimate for task in these models. 
+
+
