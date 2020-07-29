@@ -545,69 +545,149 @@ To determine which terms to include in our models, we had initially used the ste
 To replicate the procedure, first download Jags version 4.x from the source:
 https://sourceforge.net/projects/mcmc-jags/
 
+## Bayesian Lasso with hierarchical grouping structure
+
+To get the stable selection for the model specification we tried, we conduct a Bayesian linear regression analysis with the Laplace prior following Park and Casella (2008), such that we can obtain the selective model coefficients. First, we load the relevant libraries (`rjags` and `coda`) and the data.
+
 ```{r}
 library(rjags)
 library(coda)
 
-#dat = read.csv('./projects/hier_blasso/lyrics_runs.txt')
-#dat <- read.csv(here("data_", "lyrics_runs.csv"))
-#dat[dat == 'True'] = 1
-#dat[dat == 'False'] = 0
-#dat$task = factor(dat$task)
-#dat$model = factor(dat$model)
-#dat <- dat %>% group_by(task) %>% mutate(z_score=scale(score))
-dat <- test_df
+dat <- data.frame(test_df)
+dat$task.clf <- as.numeric(dat$task == 'genre_clf')
+dat$task.rec <- as.numeric(dat$task == 'rec_item_col')
+for (feat in list('audio', 'value', 'topic', 'personality', 'linguistic', 'liwc')) {
+    dat[,feat] <- as.numeric(as.factor(dat[,feat])) - 1
+}
+dat$task = factor(dat$task)
+dat$model = factor(dat$model)
+dat <- dat %>% group_by(task) %>% mutate(z_score=scale(score))
 ```
 
-Here we specify all relevant interactions:
+The model structure is as follows:
+
+\[
+y_{i} \sim \mathcal{N}(\mu_{i}, \sigma) \\
+
+\mu_{i}=\alpha_0 + \alpha^{t}_{j[i]} + \alpha^{s}_{j[i]k[i]} + x^{0}_{i} \beta_{0} + x^{1}_{i}\beta_{1} + x^{2}_{i}\beta_{2} + \cdots + x^{1}_{i}x^{2}_{i}\beta_{l} + \cdots + \prod_{m\in\mathcal{F}}x^{m}_{i}\beta_{L} \\
+\]
+
+Here, we abuse the notation to represent all the individual and interaction terms: $x^0_{i}$ refers the `audio` feature indicator, and following variable-coefficient combinations indicate all the possible interaction terms among the variables of interests. Namely, `value`, `personality`, `topic_modeling`, `LIWC`, `task[auto-tagging]`, `task[genre-clf]`, and finally `task[recsys]`. $\mathcal{F}$ denotes the set of those variables of indication variables and $L$ is the total number of interaction terms plus one more term corresponding to the `audio`, which is $L=128$. Also, another notation abuse is for indicating the task of $i$th observation as $j[i]$ and task *and* the system of $i$th observation as $j[i]k[i]$. Subsequently, the priors of the coefficients are set as follows:
+
+\[
+\alpha_0 \sim \mathcal{N}(0, 0.04^{-1}) \\
+
+\alpha^{t}_{j} \sim \mathcal{N}(\mu^{t}_{j}, \sigma^{t}_{j}) \quad j\in\{1, 2, 3\} \\
+
+\alpha^{s}_{jk} \sim \mathcal{N}(0, \sigma^{s}) \quad j\in\{1, 2, 3\}, k\in\{1,...,6\}\\
+
+\beta_{l} \sim Laplace(0, \lambda) \\
+\]
+
+Finally, the hyper-priors are set as the flat, non-informative priors mostly, since we do not have any prior knowledge about the data distribution.
+
+\[
+\sigma \sim InvGamma(2.5, 25) \\
+
+\mu^{t}_{j} \sim \mathcal{N}(0, 0.04^{-1}) \\
+
+\sigma^{t}_{j} \sim InvGamma(2.5, 25) \\
+
+\sigma^{s} \sim InvGamma(2.5, 25) \\ 
+
+\lambda^{2} \sim Gamma(1, 1)
+\]
+
+In R, the model is specified using the JAGS syntax. It could be improved by some tricks, but at the moment we hard-coded all the terms manually.
 
 ```{r}
 mod1_string = " model {
     for (i in 1:length(y)) {
         y[i] ~ dnorm(mu[i], prec)
-        mu[i] = a0 + a_task[task[i]] + a_sys[task[i], sys[i]] + b[63]*audio[i]+
-          b[1]*value[i]+b[2]*topic[i]+b[3]*task[i]+
-          b[4]*linguistic[i]+b[5]*personality[i]+
-          b[6]*liwc[i]+b[7]*value[i]*topic[i]+b[8]*value[i]*task[i]+
-          b[9]*value[i]*linguistic[i]+b[10]*value[i]*personality[i]+
-          b[11]*value[i]*liwc[i]+b[12]*topic[i]*task[i]+b[13]*topic[i]*linguistic[i]+
-          b[14]*topic[i]*personality[i]+b[15]*topic[i]*liwc[i]+
-          b[16]*task[i]*linguistic[i]+b[17]*task[i]*personality[i]+
-          b[18]*task[i]*liwc[i]+b[19]*linguistic[i]*personality[i]+
-          b[20]*linguistic[i]*liwc[i]+b[21]*personality[i]*liwc[i]+
-          b[22]*value[i]*topic[i]*task[i]+b[23]*value[i]*topic[i]*linguistic[i]+
-          b[24]*value[i]*topic[i]*personality[i]+b[25]*value[i]*topic[i]*liwc[i]+
-          b[26]*value[i]*task[i]*linguistic[i]+b[27]*value[i]*task[i]*personality[i]+
-          b[28]*value[i]*task[i]*liwc[i]+b[29]*value[i]*linguistic[i]*personality[i]+
-          b[30]*value[i]*linguistic[i]*liwc[i]+b[31]*value[i]*personality[i]*liwc[i]+
-          b[32]*topic[i]*task[i]*linguistic[i]+b[33]*topic[i]*task[i]*personality[i]+
-          b[34]*topic[i]*task[i]*liwc[i]+b[35]*topic[i]*linguistic[i]*personality[i]+
-          b[36]*topic[i]*linguistic[i]*liwc[i]+b[37]*topic[i]*personality[i]*liwc[i]+
-          b[38]*task[i]*linguistic[i]*personality[i]+b[39]*task[i]*linguistic[i]*liwc[i]+
-          b[40]*task[i]*personality[i]*liwc[i]+b[41]*linguistic[i]*personality[i]*liwc[i]+
-          b[42]*value[i]*topic[i]*task[i]*linguistic[i]+
-          b[43]*value[i]*topic[i]*task[i]*personality[i]+
-          b[44]*value[i]*topic[i]*task[i]*liwc[i]+
-          b[45]*value[i]*topic[i]*linguistic[i]*personality[i]+
-          b[46]*value[i]*topic[i]*linguistic[i]*liwc[i]+
-          b[47]*value[i]*topic[i]*personality[i]*liwc[i]+
-          b[48]*value[i]*task[i]*linguistic[i]*personality[i]+
-          b[49]*value[i]*task[i]*linguistic[i]*liwc[i]+
-          b[50]*value[i]*task[i]*personality[i]*liwc[i]+
-          b[51]*value[i]*linguistic[i]*personality[i]*liwc[i]+
-          b[52]*topic[i]*task[i]*linguistic[i]*personality[i]+
-          b[53]*topic[i]*task[i]*linguistic[i]*liwc[i]+
-          b[54]*topic[i]*task[i]*personality[i]*liwc[i]+
-          b[55]*topic[i]*linguistic[i]*personality[i]*liwc[i]+
-          b[56]*task[i]*linguistic[i]*personality[i]*liwc[i]+
-          b[57]*value[i]*topic[i]*task[i]*linguistic[i]*personality[i]+
-          b[58]*value[i]*topic[i]*task[i]*linguistic[i]*liwc[i]+
-          b[59]*value[i]*topic[i]*task[i]*personality[i]*liwc[i]+
-          b[60]*value[i]*topic[i]*linguistic[i]*personality[i]*liwc[i]+
-          b[61]*value[i]*task[i]*linguistic[i]*personality[i]*liwc[i]+
-          b[62]*topic[i]*task[i]*linguistic[i]*personality[i]*liwc[i]
+        mu[i] = a0 + a_task[task[i]] + a_sys[task[i], sys[i]] + b[1]*audio[i] +
+            b[2]*task.clf[i]+b[3]*task.rec[i]+b[4]*value[i]+b[5]*topic[i]+
+            b[6]*linguistic[i]+b[7]*liwc[i]+b[8]*personality[i]+
+            b[9]*task.clf[i]*task.rec[i]+b[10]*task.clf[i]*value[i]+
+            b[11]*task.clf[i]*topic[i]+b[12]*task.clf[i]*linguistic[i]+
+            b[13]*task.clf[i]*liwc[i]+b[14]*task.clf[i]*personality[i]+
+            b[15]*task.rec[i]*value[i]+b[16]*task.rec[i]*topic[i]+
+            b[17]*task.rec[i]*linguistic[i]+b[18]*task.rec[i]*liwc[i]+
+            b[19]*task.rec[i]*personality[i]+b[20]*value[i]*topic[i]+
+            b[21]*value[i]*linguistic[i]+b[22]*value[i]*liwc[i]+
+            b[23]*value[i]*personality[i]+b[24]*topic[i]*linguistic[i]+
+            b[25]*topic[i]*liwc[i]+b[26]*topic[i]*personality[i]+
+            b[27]*linguistic[i]*liwc[i]+b[28]*linguistic[i]*personality[i]+
+            b[29]*liwc[i]*personality[i]+b[30]*task.clf[i]*task.rec[i]*value[i]+
+            b[31]*task.clf[i]*task.rec[i]*topic[i]+
+            b[32]*task.clf[i]*task.rec[i]*linguistic[i]+b[33]*task.clf[i]*task.rec[i]*liwc[i]+
+            b[34]*task.clf[i]*task.rec[i]*personality[i]+
+            b[35]*task.clf[i]*value[i]*topic[i]+b[36]*task.clf[i]*value[i]*linguistic[i]+
+            b[37]*task.clf[i]*value[i]*liwc[i]+b[38]*task.clf[i]*value[i]*personality[i]+
+            b[39]*task.clf[i]*topic[i]*linguistic[i]+b[40]*task.clf[i]*topic[i]*liwc[i]+
+            b[41]*task.clf[i]*topic[i]*personality[i]+b[42]*task.clf[i]*linguistic[i]*liwc[i]+
+            b[43]*task.clf[i]*linguistic[i]*personality[i]+
+            b[44]*task.clf[i]*liwc[i]*personality[i]+b[45]*task.rec[i]*value[i]*topic[i]+
+            b[46]*task.rec[i]*value[i]*linguistic[i]+b[47]*task.rec[i]*value[i]*liwc[i]+
+            b[48]*task.rec[i]*value[i]*personality[i]+b[49]*task.rec[i]*topic[i]*linguistic[i]+
+            b[50]*task.rec[i]*topic[i]*liwc[i]+b[51]*task.rec[i]*topic[i]*personality[i]+
+            b[52]*task.rec[i]*linguistic[i]*liwc[i]+b[53]*task.rec[i]*linguistic[i]*personality[i]+
+            b[54]*task.rec[i]*liwc[i]*personality[i]+b[55]*value[i]*topic[i]*linguistic[i]+
+            b[56]*value[i]*topic[i]*liwc[i]+b[57]*value[i]*topic[i]*personality[i]+
+            b[58]*value[i]*linguistic[i]*liwc[i]+b[59]*value[i]*linguistic[i]*personality[i]+
+            b[60]*value[i]*liwc[i]*personality[i]+b[61]*topic[i]*linguistic[i]*liwc[i]+
+            b[62]*topic[i]*linguistic[i]*personality[i]+b[63]*topic[i]*liwc[i]*personality[i]+
+            b[64]*linguistic[i]*liwc[i]*personality[i]+
+            b[65]*task.clf[i]*task.rec[i]*value[i]*topic[i]+
+            b[66]*task.clf[i]*task.rec[i]*value[i]*linguistic[i]+
+            b[67]*task.clf[i]*task.rec[i]*value[i]*liwc[i]+
+            b[68]*task.clf[i]*task.rec[i]*value[i]*personality[i]+
+            b[69]*task.clf[i]*task.rec[i]*topic[i]*linguistic[i]+
+            b[70]*task.clf[i]*task.rec[i]*topic[i]*liwc[i]+
+            b[71]*task.clf[i]*task.rec[i]*topic[i]*personality[i]+
+            b[72]*task.clf[i]*task.rec[i]*linguistic[i]*liwc[i]+b[73]*task.clf[i]*task.rec[i]*linguistic[i]*personality[i]+
+            b[74]*task.clf[i]*task.rec[i]*liwc[i]*personality[i]+b[75]*task.clf[i]*value[i]*topic[i]*linguistic[i]+
+            b[76]*task.clf[i]*value[i]*topic[i]*liwc[i]+b[77]*task.clf[i]*value[i]*topic[i]*personality[i]+
+            b[78]*task.clf[i]*value[i]*linguistic[i]*liwc[i]+b[79]*task.clf[i]*value[i]*linguistic[i]*personality[i]+
+            b[80]*task.clf[i]*value[i]*liwc[i]*personality[i]+b[81]*task.clf[i]*topic[i]*linguistic[i]*liwc[i]+
+            b[82]*task.clf[i]*topic[i]*linguistic[i]*personality[i]+
+            b[83]*task.clf[i]*topic[i]*liwc[i]*personality[i]+b[84]*task.clf[i]*linguistic[i]*liwc[i]*personality[i]+
+            b[85]*task.rec[i]*value[i]*topic[i]*linguistic[i]+b[86]*task.rec[i]*value[i]*topic[i]*liwc[i]+
+            b[87]*task.rec[i]*value[i]*topic[i]*personality[i]+b[88]*task.rec[i]*value[i]*linguistic[i]*liwc[i]+
+            b[89]*task.rec[i]*value[i]*linguistic[i]*personality[i]+b[90]*task.rec[i]*value[i]*liwc[i]*personality[i]+
+            b[91]*task.rec[i]*topic[i]*linguistic[i]*liwc[i]+b[92]*task.rec[i]*topic[i]*linguistic[i]*personality[i]+
+            b[93]*task.rec[i]*topic[i]*liwc[i]*personality[i]+b[94]*task.rec[i]*linguistic[i]*liwc[i]*personality[i]+
+            b[95]*value[i]*topic[i]*linguistic[i]*liwc[i]+b[96]*value[i]*topic[i]*linguistic[i]*personality[i]+
+            b[97]*value[i]*topic[i]*liwc[i]*personality[i]+b[98]*value[i]*linguistic[i]*liwc[i]*personality[i]+
+            b[99]*topic[i]*linguistic[i]*liwc[i]*personality[i]+
+            b[100]*task.clf[i]*task.rec[i]*value[i]*topic[i]*linguistic[i]+
+            b[101]*task.clf[i]*task.rec[i]*value[i]*topic[i]*liwc[i]+
+            b[102]*task.clf[i]*task.rec[i]*value[i]*topic[i]*personality[i]+
+            b[103]*task.clf[i]*task.rec[i]*value[i]*linguistic[i]*liwc[i]+
+            b[104]*task.clf[i]*task.rec[i]*value[i]*linguistic[i]*personality[i]+
+            b[105]*task.clf[i]*task.rec[i]*value[i]*liwc[i]*personality[i]+
+            b[106]*task.clf[i]*task.rec[i]*topic[i]*linguistic[i]*liwc[i]+
+            b[107]*task.clf[i]*task.rec[i]*topic[i]*linguistic[i]*personality[i]+
+            b[108]*task.clf[i]*task.rec[i]*topic[i]*liwc[i]*personality[i]+
+            b[109]*task.clf[i]*task.rec[i]*linguistic[i]*liwc[i]*personality[i]+
+            b[110]*task.clf[i]*value[i]*topic[i]*linguistic[i]*liwc[i]+
+            b[111]*task.clf[i]*value[i]*topic[i]*linguistic[i]*personality[i]+
+            b[112]*task.clf[i]*value[i]*topic[i]*liwc[i]*personality[i]+
+            b[113]*task.clf[i]*value[i]*linguistic[i]*liwc[i]*personality[i]+
+            b[114]*task.clf[i]*topic[i]*linguistic[i]*liwc[i]*personality[i]+
+            b[115]*task.rec[i]*value[i]*topic[i]*linguistic[i]*liwc[i]+
+            b[116]*task.rec[i]*value[i]*topic[i]*linguistic[i]*personality[i]+
+            b[117]*task.rec[i]*value[i]*topic[i]*liwc[i]*personality[i]+
+            b[118]*task.rec[i]*value[i]*linguistic[i]*liwc[i]*personality[i]+
+            b[119]*task.rec[i]*topic[i]*linguistic[i]*liwc[i]*personality[i]+
+            b[120]*value[i]*topic[i]*linguistic[i]*liwc[i]*personality[i]+
+            b[121]*task.clf[i]*task.rec[i]*value[i]*topic[i]*linguistic[i]*liwc[i]+
+            b[122]*task.clf[i]*task.rec[i]*value[i]*topic[i]*linguistic[i]*personality[i]+
+            b[123]*task.clf[i]*task.rec[i]*value[i]*topic[i]*liwc[i]*personality[i]+
+            b[124]*task.clf[i]*task.rec[i]*value[i]*linguistic[i]*liwc[i]*personality[i]+
+            b[125]*task.clf[i]*task.rec[i]*topic[i]*linguistic[i]*liwc[i]*personality[i]+
+            b[126]*task.clf[i]*value[i]*topic[i]*linguistic[i]*liwc[i]*personality[i]+
+            b[127]*task.rec[i]*value[i]*topic[i]*linguistic[i]*liwc[i]*personality[i]
     }
-    
 
     for (j in 1:3) {
         a_task[j] ~ dnorm(c_mu[j], c_sig[j])
@@ -617,7 +697,7 @@ mod1_string = " model {
     }
     a0 ~ dnorm(0.0, 1./25.)
     
-    for (l in 1:63) {
+    for (l in 1:127) {
         b[l] ~ ddexp(0.0, sqrt(lam_sqr)) # has variance 1.0
     }
     
@@ -654,7 +734,7 @@ mod = jags.model(textConnection(mod1_string), data=data_jags, n.chains=3)
 update(mod, 1e3) # burn-in
 ```
 
-The next process will take some hours to run. To look at the results of our previous run, simply load the object here:
+The next process will take ***some hours*** to run. To look at the results of our previous run, simply load the object here:
 
 ```{r}
 #base::load(here("mod_sim.rda"))
@@ -673,7 +753,7 @@ save(mod_sim, file = "mod_sim.rda")
 Figures and visualizations:
 
 ```{r}
-mod_csim = as.mcmc(do.call(rbind, mod_sim)) # combine multiple chains
+mod_csim = as.mcmc(do.call(rbind, mod_sim), thin=1) # combine multiple chains
 
 ## convergence diagnostics
 graphics.off()
@@ -685,5 +765,19 @@ gelman.diag(mod_sim)
 autocorr.diag(mod_sim)
 autocorr.plot(mod_sim)
 effectiveSize(mod_sim)
-
 ```
+
+Now we can print out the credible interval for all the effects, to see how they're robust.
+
+```{r}
+# here we compute the credible interval at 95% credibility
+HPDinterval(mod_csim, prob=0.95)
+```
+
+With the rather explorative regression analysis, we found the posterior distribution of a subset of variables do not overlap to $0$ at 95% credibility. Namely:
+
+- `overall intercept`
+- `audio`
+- `value`
+- `liwc`
+- `liwc:task[genre-clf]`
