@@ -519,6 +519,8 @@ Order can be adjusted with the following commented commands:
 
 What we observe is what appears to be a more accurate estimate for the genre classification task, and that it appears to have a small, positive effect. The other two tasks appear to be poorly estimated, given the wide confidence intervals. 
 
+However, we chose not to include or interpret these models for three reasons: Firstly, we had standardized score within task, secondly we were aware that task was a part of the structure of our dataset, and thirdly our main effects of interest were not affected by whether or not we adjusted the random effects specifications of our model. As such, we elected not to directly interpret the parameter estimate for task in these models. 
+
 
 ```{r}
 stan9.plot <- plot_model(stan9.1, ci.lvl=0.95)
@@ -538,6 +540,150 @@ plot2 <- cowplot::plot_grid(stan9.plot, right_column_plot, ncol=2, align="h", la
 plot2
 ```
 
-However, we chose not to include or interpret these models for three reasons: Firstly, we had standardized score within task, secondly we were aware that task was a part of the structure of our dataset, and thirdly our main effects of interest were not affected by whether or not we adjusted the random effects specifications of our model. As such, we elected not to directly interpret the parameter estimate for task in these models. 
+To determine which terms to include in our models, we had initially used the step function from the lmerTest package. We later learned that this was suboptimal, so we adopted a more robust procedure for variable selection, which is detailed below. Importantly, this was conducted a posteriori, as a validation of our choices. 
 
+To replicate the procedure, first download Jags version 4.x from the source:
+https://sourceforge.net/projects/mcmc-jags/
 
+```{r}
+library(rjags)
+library(coda)
+
+#dat = read.csv('./projects/hier_blasso/lyrics_runs.txt')
+#dat <- read.csv(here("data_", "lyrics_runs.csv"))
+#dat[dat == 'True'] = 1
+#dat[dat == 'False'] = 0
+#dat$task = factor(dat$task)
+#dat$model = factor(dat$model)
+#dat <- dat %>% group_by(task) %>% mutate(z_score=scale(score))
+dat <- test_df
+```
+
+Here we specify all relevant interactions:
+
+```{r}
+mod1_string = " model {
+    for (i in 1:length(y)) {
+        y[i] ~ dnorm(mu[i], prec)
+        mu[i] = a0 + a_task[task[i]] + a_sys[task[i], sys[i]] + b[63]*audio[i]+
+          b[1]*value[i]+b[2]*topic[i]+b[3]*task[i]+
+          b[4]*linguistic[i]+b[5]*personality[i]+
+          b[6]*liwc[i]+b[7]*value[i]*topic[i]+b[8]*value[i]*task[i]+
+          b[9]*value[i]*linguistic[i]+b[10]*value[i]*personality[i]+
+          b[11]*value[i]*liwc[i]+b[12]*topic[i]*task[i]+b[13]*topic[i]*linguistic[i]+
+          b[14]*topic[i]*personality[i]+b[15]*topic[i]*liwc[i]+
+          b[16]*task[i]*linguistic[i]+b[17]*task[i]*personality[i]+
+          b[18]*task[i]*liwc[i]+b[19]*linguistic[i]*personality[i]+
+          b[20]*linguistic[i]*liwc[i]+b[21]*personality[i]*liwc[i]+
+          b[22]*value[i]*topic[i]*task[i]+b[23]*value[i]*topic[i]*linguistic[i]+
+          b[24]*value[i]*topic[i]*personality[i]+b[25]*value[i]*topic[i]*liwc[i]+
+          b[26]*value[i]*task[i]*linguistic[i]+b[27]*value[i]*task[i]*personality[i]+
+          b[28]*value[i]*task[i]*liwc[i]+b[29]*value[i]*linguistic[i]*personality[i]+
+          b[30]*value[i]*linguistic[i]*liwc[i]+b[31]*value[i]*personality[i]*liwc[i]+
+          b[32]*topic[i]*task[i]*linguistic[i]+b[33]*topic[i]*task[i]*personality[i]+
+          b[34]*topic[i]*task[i]*liwc[i]+b[35]*topic[i]*linguistic[i]*personality[i]+
+          b[36]*topic[i]*linguistic[i]*liwc[i]+b[37]*topic[i]*personality[i]*liwc[i]+
+          b[38]*task[i]*linguistic[i]*personality[i]+b[39]*task[i]*linguistic[i]*liwc[i]+
+          b[40]*task[i]*personality[i]*liwc[i]+b[41]*linguistic[i]*personality[i]*liwc[i]+
+          b[42]*value[i]*topic[i]*task[i]*linguistic[i]+
+          b[43]*value[i]*topic[i]*task[i]*personality[i]+
+          b[44]*value[i]*topic[i]*task[i]*liwc[i]+
+          b[45]*value[i]*topic[i]*linguistic[i]*personality[i]+
+          b[46]*value[i]*topic[i]*linguistic[i]*liwc[i]+
+          b[47]*value[i]*topic[i]*personality[i]*liwc[i]+
+          b[48]*value[i]*task[i]*linguistic[i]*personality[i]+
+          b[49]*value[i]*task[i]*linguistic[i]*liwc[i]+
+          b[50]*value[i]*task[i]*personality[i]*liwc[i]+
+          b[51]*value[i]*linguistic[i]*personality[i]*liwc[i]+
+          b[52]*topic[i]*task[i]*linguistic[i]*personality[i]+
+          b[53]*topic[i]*task[i]*linguistic[i]*liwc[i]+
+          b[54]*topic[i]*task[i]*personality[i]*liwc[i]+
+          b[55]*topic[i]*linguistic[i]*personality[i]*liwc[i]+
+          b[56]*task[i]*linguistic[i]*personality[i]*liwc[i]+
+          b[57]*value[i]*topic[i]*task[i]*linguistic[i]*personality[i]+
+          b[58]*value[i]*topic[i]*task[i]*linguistic[i]*liwc[i]+
+          b[59]*value[i]*topic[i]*task[i]*personality[i]*liwc[i]+
+          b[60]*value[i]*topic[i]*linguistic[i]*personality[i]*liwc[i]+
+          b[61]*value[i]*task[i]*linguistic[i]*personality[i]*liwc[i]+
+          b[62]*topic[i]*task[i]*linguistic[i]*personality[i]*liwc[i]
+    }
+    
+
+    for (j in 1:3) {
+        a_task[j] ~ dnorm(c_mu[j], c_sig[j])
+        for (k in 1:6) {
+            a_sys[j, k] ~ dnorm(0, sig_sys)
+        }
+    }
+    a0 ~ dnorm(0.0, 1./25.)
+    
+    for (l in 1:63) {
+        b[l] ~ ddexp(0.0, sqrt(lam_sqr)) # has variance 1.0
+    }
+    
+    for (j in 1:3) {
+        c_mu[j] ~ dnorm(0., 1./25.)
+        c_sig[j] ~ dgamma(5/2., 5.*10./2.)
+    }
+    sig_sys ~ dgamma(5/2., 5.*10./2.)
+    
+    lam_sqr ~ dgamma(1, 1)
+    prec ~ dgamma(5/2.0, 5*10.0/2.0)
+    sig = sqrt( 1.0 / prec )
+} "
+```
+
+Although we set a seed in rjags, the seed in jags itself has not been set. As such, results will vary. 
+
+```{r}
+set.seed(116)
+data_jags = list(y=as.numeric(dat$score_z),
+                 audio=as.numeric(dat$audio),
+                 topic=as.numeric(dat$topic),
+                 personality=as.numeric(dat$personality),
+                 liwc=as.numeric(dat$liwc),
+                 linguistic=as.numeric(dat$linguistic),
+                 value=as.numeric(dat$value),
+                 sys=as.numeric(dat$model),
+                 task=as.numeric(dat$task))
+# table(data_jags$is_oil, data_jags$region)
+
+params = c("a0", "a_sys", "a_task", "b", "sig", "lam_sqr", "c_mu", "c_sig", "sig_sys")
+
+mod = jags.model(textConnection(mod1_string), data=data_jags, n.chains=3)
+update(mod, 1e3) # burn-in
+```
+
+The next process will take some hours to run. To look at the results of our previous run, simply load the object here:
+
+```{r}
+#base::load(here("mod_sim.rda"))
+```
+
+Otherwise run the complete process here:
+
+```{r}
+mod_sim = coda.samples(model=mod,
+                       variable.names=params,
+                       n.iter=1e5)
+
+save(mod_sim, file = "mod_sim.rda")
+```
+
+Figures and visualizations:
+
+```{r}
+mod_csim = as.mcmc(do.call(rbind, mod_sim)) # combine multiple chains
+
+## convergence diagnostics
+graphics.off()
+ par("mar")
+ par(mar=c(1,1,1,1))
+plot(mod_sim)
+
+gelman.diag(mod_sim)
+autocorr.diag(mod_sim)
+autocorr.plot(mod_sim)
+effectiveSize(mod_sim)
+
+```
