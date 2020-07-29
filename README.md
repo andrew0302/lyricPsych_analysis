@@ -21,7 +21,6 @@ This project is licensed under the MIT License - see the [LICENSE.md](LICENSE.md
 
 ## Acknowledgments
 
-* Hat tip to anyone whose code was used
-* Inspiration
-* etc
+* Chelsea Parlett Pelleriti, the one and only Chatistician, consulted on this project:
+https://cmparlettpelleriti.github.io/TheChatistician.html
 
