@@ -542,12 +542,14 @@ plot2
 
 To determine which terms to include in our models, we had initially used the step function from the lmerTest package. We later learned that this was suboptimal, so we adopted a more robust procedure for variable selection, which is detailed below. Importantly, this was conducted a posteriori, as a validation of our choices. 
 
-To replicate the procedure, first download Jags version 4.x from the source:
+To replicate the procedure, first download Jags version 4.x from the source and install:
 https://sourceforge.net/projects/mcmc-jags/
 
 ## Bayesian Lasso with hierarchical grouping structure
 
-To get the stable selection for the model specification we tried, we conduct a Bayesian linear regression analysis with the Laplace prior following Park and Casella (2008), such that we can obtain the selective model coefficients. First, we load the relevant libraries (`rjags` and `coda`) and the data.
+To get a stable selection for the model specification we tried, we conduct a Bayesian linear regression analysis with the Laplace prior following Park and Casella (2008):, such that we can obtain the selective model coefficients. First, we load the relevant libraries (`rjags` and `coda`) and the data.
+
+https://people.eecs.berkeley.edu/~jordan/courses/260-spring09/other-readings/park-casella.pdf
 
 ```{r}
 library(rjags)
@@ -584,7 +586,7 @@ Here, we abuse the notation to represent all the individual and interaction term
 \beta_{l} \sim Laplace(0, \lambda) \\
 \]
 
-Notably, the prior for each effects $\beta_{l}$ set as the Laplace distribution such that the model drive the effects to zero. Finally, the hyper-priors are set as the flat, non-informative priors mostly, since we do not have any prior knowledge about the data distribution.
+Notably, the prior for each effect's $\beta_{l}$ is set as the Laplace distribution such that the model drives the effects to zero. Finally, the hyper-priors are set as mostly flat, non-informative priors, since we do not have any prior knowledge about the data distribution.
 
 \[
 \sigma \sim InvGamma(2.5, 25) \\
@@ -739,7 +741,7 @@ update(mod, 1e3) # burn-in
 The next process will take ***some hours*** to run. To look at the results of our previous run, simply load the object here:
 
 ```{r}
-#base::load(here("mod_sim.rda"))
+base::load(here("mod_sim.rda"))
 ```
 
 Otherwise run the complete process here:
@@ -763,7 +765,7 @@ graphics.off()
 plot(mod_sim)
 ```
 
-We run a few diagnostics for the model convergence. It seems we need to run model longer run (at least 5~6 times) according to Gelman's diganostics. The auto-correlation diagnostics also suggests it needs more long run. We suppose it's mostly due to the nested structure we introduced to the experiment is not having strong grouping effect. But to ensure this we might need a further study.
+We run a few diagnostics for the model convergence. It seems we need to a longer run (at least 5~6 times) according to Gelman's diganostics. The auto-correlation diagnostics also suggests it needs a longer run. We suppose it's likely because the nested structure introduced in the experiment does not have a strong grouping effect. But to ensure this we might need a further study.
 
 ```{r}
 gelman.diag(mod_sim)
@@ -782,6 +784,9 @@ HPDinterval(mod_csim, prob=0.9)
 With the rather explorative regression analysis, we found the posterior distribution of a subset of variables do not overlap to $0$ at 90% credibility. Namely:
 
 - `audio`
-- `value` (it's almost also sure for 95% level, but it's not as always dodging it, but also our model is not fully converged yet.)
+- `value` (it's almost also sure at the 95% level, although it's also not always dodging it, but also our model has not fully converged yet.)
 - `liwc`
 - `liwc:task[genre-clf]`
+
+
+
