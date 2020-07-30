@@ -572,7 +572,7 @@ y_{i} \sim \mathcal{N}(\mu_{i}, \sigma) \\
 \mu_{i}=\alpha_0 + \alpha^{t}_{j[i]} + \alpha^{s}_{j[i]k[i]} + x^{0}_{i} \beta_{0} + x^{1}_{i}\beta_{1} + x^{2}_{i}\beta_{2} + \cdots + x^{1}_{i}x^{2}_{i}\beta_{l} + \cdots + \prod_{m\in\mathcal{F}}x^{m}_{i}\beta_{L} \\
 \]
 
-Here, we abuse the notation to represent all the individual and interaction terms: $x^0_{i}$ refers the `audio` feature indicator, and following variable-coefficient combinations indicate all the possible interaction terms among the variables of interests. Namely, `value`, `personality`, `topic_modeling`, `LIWC`, `task[auto-tagging]`, `task[genre-clf]`, and finally `task[recsys]`. $\mathcal{F}$ denotes the set of those variables of indication variables and $L$ is the total number of interaction terms plus one more term corresponding to the `audio`, which is $L=128$. Also, another notation abuse is for indicating the task of $i$th observation as $j[i]$ and task *and* the system of $i$th observation as $j[i]k[i]$. Subsequently, the priors of the coefficients are set as follows:
+Here, we abuse the notation to represent all the individual and interaction terms: $x^0_{i}$ refers the `audio` feature indicator, and following variable-coefficient combinations indicate all the possible interaction terms among the variables of interests. Namely, `value`, `personality`, `topic_modeling`, `LIWC`, `task[genre-clf]`, and finally `task[recsys]` (`task[auto-tagging]` is implicitly coded in other two task-related indicator variables). $\mathcal{F}$ denotes the set of those variables of indication variables and $L=127$ is the total number of individual and interaction terms plus one more term corresponding to the `audio`. Also, another notation abuse is token for indicating the task of $i$th observation (as $j[i]$) and task *and* the system of $i$th observation (as $j[i]k[i]$). Subsequently, the priors of the coefficients are set as follows:
 
 \[
 \alpha_0 \sim \mathcal{N}(0, 0.04^{-1}) \\
@@ -584,7 +584,7 @@ Here, we abuse the notation to represent all the individual and interaction term
 \beta_{l} \sim Laplace(0, \lambda) \\
 \]
 
-Finally, the hyper-priors are set as the flat, non-informative priors mostly, since we do not have any prior knowledge about the data distribution.
+Notably, the prior for each effects $\beta_{l}$ set as the Laplace distribution such that the model drive the effects to zero. Finally, the hyper-priors are set as the flat, non-informative priors mostly, since we do not have any prior knowledge about the data distribution.
 
 \[
 \sigma \sim InvGamma(2.5, 25) \\
@@ -717,7 +717,7 @@ Although we set a seed in rjags, the seed in jags itself has not been set. As su
 
 ```{r}
 set.seed(116)
-data_jags = list(y=as.numeric(dat$score_z),
+data_jags = list(y=as.numeric(dat$z_score),
                  audio=as.numeric(dat$audio),
                  topic=as.numeric(dat$topic),
                  personality=as.numeric(dat$personality),
@@ -725,7 +725,9 @@ data_jags = list(y=as.numeric(dat$score_z),
                  linguistic=as.numeric(dat$linguistic),
                  value=as.numeric(dat$value),
                  sys=as.numeric(dat$model),
-                 task=as.numeric(dat$task))
+                 task=as.numeric(dat$task),
+                 task.clf=as.numeric(dat$task.clf),
+                 task.rec=as.numeric(dat$task.rec))
 # table(data_jags$is_oil, data_jags$region)
 
 params = c("a0", "a_sys", "a_task", "b", "sig", "lam_sqr", "c_mu", "c_sig", "sig_sys")
@@ -748,19 +750,22 @@ mod_sim = coda.samples(model=mod,
                        n.iter=1e5)
 
 save(mod_sim, file = "mod_sim.rda")
+mod_csim = as.mcmc(do.call(rbind, mod_sim), thin=1) # combine multiple chains
 ```
 
 Figures and visualizations:
 
 ```{r}
-mod_csim = as.mcmc(do.call(rbind, mod_sim), thin=1) # combine multiple chains
-
 ## convergence diagnostics
 graphics.off()
  par("mar")
  par(mar=c(1,1,1,1))
 plot(mod_sim)
+```
 
+We run a few diagnostics for the model convergence. It seems we need to run model longer run (at least 5~6 times) according to Gelman's diganostics. The auto-correlation diagnostics also suggests it needs more long run. We suppose it's mostly due to the nested structure we introduced to the experiment is not having strong grouping effect. But to ensure this we might need a further study.
+
+```{r}
 gelman.diag(mod_sim)
 autocorr.diag(mod_sim)
 autocorr.plot(mod_sim)
@@ -771,13 +776,12 @@ Now we can print out the credible interval for all the effects, to see how they'
 
 ```{r}
 # here we compute the credible interval at 95% credibility
-HPDinterval(mod_csim, prob=0.95)
+HPDinterval(mod_csim, prob=0.9)
 ```
 
-With the rather explorative regression analysis, we found the posterior distribution of a subset of variables do not overlap to $0$ at 95% credibility. Namely:
+With the rather explorative regression analysis, we found the posterior distribution of a subset of variables do not overlap to $0$ at 90% credibility. Namely:
 
-- `overall intercept`
 - `audio`
-- `value`
+- `value` (it's almost also sure for 95% level, but it's not as always dodging it, but also our model is not fully converged yet.)
 - `liwc`
 - `liwc:task[genre-clf]`
