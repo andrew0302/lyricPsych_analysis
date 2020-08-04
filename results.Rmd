@@ -36,6 +36,8 @@ numCores <- (detectCores()-1)
 renv::restore()
 ```
 
+Loading data and adjusting variables:
+
 ```{r dataset}
 df <- read.csv(here("data_", "lyrics_runs.csv"))
 test_df <- df %>% filter(personality=="True"|topic=="True"|linguistic=="True"|liwc=="True"|value=="True"|audio=="True")
@@ -321,8 +323,8 @@ bottom_plot <- models.sca %>%
     `liwc*task[MR]`=`liwc:taskrec_item_cold`,
     `value*task[MGC]`=`value:taskgenre_clf`,
     `value*task[MR]`=`value:taskrec_item_cold`,
-    `task (intercept*)` = `task _ sd__(Intercept)`,
-    `model*task (intercept*)` = `model:task _ sd__(Intercept)`)
+    `task (intercept!)` = `task _ sd__(Intercept)`,
+    `model*task (intercept!)` = `model:task _ sd__(Intercept)`)
 
 variable.names = colnames(select(bottom_plot, -model_num))
 
@@ -330,7 +332,7 @@ slope_line <- data.frame(5, "model*task (model-slope*)", "|")
 names(slope_line) <- c("model_num", "variable", "value")
 
 var_names <- c(
-  'task (intercept*)', 'model*task (intercept*)', 'model*task (model-slope*)', 
+  'task (intercept!)', 'model*task (intercept!)', 'model*task (model-slope!)', 
   'liwc*task[MGC]', 'liwc*task[MR]', 'value*task[MGC]', 'value*task[MR]', 
   'task[MGC]', 'audio', 'liwc', 'value', 'personality', 'linguistic', 'topic',
   '(Intercept)'
